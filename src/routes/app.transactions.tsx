@@ -9,7 +9,7 @@ import {
 } from "@/db-collections/index";
 import { generateTransactionHash } from "@/lib/utils";
 
-export const Route = createFileRoute("/app/")({
+export const Route = createFileRoute("/app/transactions")({
 	component: RouteComponent,
 });
 
@@ -19,7 +19,7 @@ const parseAmount = (amount: string | undefined): number => {
 	if (!amount) return 0;
 	return Number.parseFloat(
 		amount.replace("$", "").replace(",", "").replace("(", "-").replace(")", ""),
-	);
+	)
 };
 
 const parseDate = (rawDate: string): number => {
@@ -42,7 +42,7 @@ function RouteComponent() {
 			.select(({ transaction }) => ({
 				...transaction,
 			})),
-	);
+	)
 
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -80,7 +80,7 @@ function RouteComponent() {
 						rawDate,
 						rawDescription,
 						rawAmount,
-					);
+					)
 
 					const amount = parseAmount(rawAmount);
 					const date = parseDate(rawDate);
@@ -90,7 +90,7 @@ function RouteComponent() {
 						date,
 						description: rawDescription,
 						amount,
-					};
+					}
 					try {
 						console.log("Inserting new transaction:", transaction);
 						transactionsCollection.insert(transaction);
@@ -107,12 +107,12 @@ function RouteComponent() {
 				console.error("Error parsing CSV:", error);
 				setIsLoading(false);
 			},
-		});
-	};
+		})
+	}
 
 	const handleButtonClick = () => {
 		fileInputRef.current?.click();
-	};
+	}
 
 	return (
 		<div className="flex flex-col items-center p-10 h-screen">
@@ -180,5 +180,5 @@ function RouteComponent() {
 				</div>
 			)}
 		</div>
-	);
+	)
 }
