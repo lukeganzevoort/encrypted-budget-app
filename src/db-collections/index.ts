@@ -22,7 +22,7 @@ export const messagesCollection = createCollection(
 
 const TransactionSchema = z.object({
 	id: z.string(),
-	date: z.string(),
+	date: z.date(),
 	description: z.string(),
 	amount: z.number(),
 });

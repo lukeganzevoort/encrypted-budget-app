@@ -7,12 +7,27 @@ import {
 	type Transaction,
 	transactionsCollection,
 } from "@/db-collections/index";
+import { generateTransactionHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/")({
 	component: RouteComponent,
 });
 
-type CsvRow = Record<string, string>;
+type CsvRow = Record<string, string | undefined>;
+
+const parseAmount = (amount: string | undefined): number => {
+	if (!amount) return 0;
+	return Number.parseFloat(
+		amount.replace("$", "").replace(",", "").replace("(", "-").replace(")", ""),
+	);
+};
+
+const parseDate = (rawDate: string) => {
+	// Parse as UTC to avoid local timezone interpretation
+	const isoString = new Date(rawDate).toISOString();
+	console.log("isoString", isoString);
+	return new Date(isoString.split("T")[0]);
+};
 
 function RouteComponent() {
 	const [fileName, setFileName] = useState<string>("");
@@ -38,39 +53,41 @@ function RouteComponent() {
 		Papa.parse<CsvRow>(file, {
 			transformHeader(header) {
 				if (/\bamount\b/i.test(header)) {
-					return "amount";
+					return "rawAmount";
 				}
 				if (/\bdate\b/i.test(header)) {
-					return "date";
+					return "rawDate";
 				}
 				if (/\bdescription\b/i.test(header)) {
-					return "description";
+					return "rawDescription";
 				}
 				return header;
 			},
-			complete: (results) => {
+			complete: async (results) => {
 				console.log("Parsed CSV data:", results.data);
 
 				// Insert parsed data into transactions collection
 				for (const row of results.data) {
-					const date = row.date || row.Date || "";
-					const description = row.description || row.Description || "";
-					const amount = Number.parseFloat(
-						(row.amount || row.Amount || "0")
-							.replace("$", "")
-							.replace(",", "")
-							.replace("(", "-")
-							.replace(")", ""),
+					const { rawDate, rawDescription, rawAmount } = row;
+
+					if (!rawDate || !rawDescription || !rawAmount) {
+						throw new Error("Missing required fields");
+					}
+
+					// Generate a unique hash ID based on transaction data
+					const uniqueId = await generateTransactionHash(
+						rawDate,
+						rawDescription,
+						rawAmount,
 					);
 
-					// Create a unique ID based on transaction data
-					// TODO: use a better hash function
-					const uniqueId = `${date}-${description}-${amount}`;
+					const amount = parseAmount(rawAmount);
+					const date = parseDate(rawDate);
 
 					const transaction: Transaction = {
 						id: uniqueId,
 						date,
-						description,
+						description: rawDescription,
 						amount,
 					};
 					try {
@@ -133,7 +150,14 @@ function RouteComponent() {
 										key={transaction.id}
 										className="border-b hover:bg-gray-50"
 									>
-										<td className="p-3">{transaction.date}</td>
+										<td className="p-3">
+											{transaction.date.getUTCMonth() + 1}/
+											{transaction.date.getUTCDate()}
+											{transaction.date.getUTCFullYear() ===
+											new Date().getUTCFullYear()
+												? ""
+												: `/${transaction.date.getUTCFullYear()}`}
+										</td>
 										<td className="p-3">{transaction.description}</td>
 										<td className="p-3 text-right">
 											{transaction.amount < 0 && "-"}$
