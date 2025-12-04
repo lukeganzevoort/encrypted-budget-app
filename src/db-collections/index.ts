@@ -37,3 +37,37 @@ export const transactionsCollection = createCollection(
 		schema: TransactionSchema,
 	}),
 );
+
+const BudgetSettingsSchema = z.object({
+	id: z.string(),
+	monthlyIncome: z.number(),
+});
+
+export type BudgetSettings = z.infer<typeof BudgetSettingsSchema>;
+
+export const budgetSettingsCollection = createCollection(
+	localStorageCollectionOptions({
+		id: "budget-settings",
+		storageKey: "budget-settings",
+		getKey: (settings) => settings.id,
+		schema: BudgetSettingsSchema,
+	}),
+);
+
+const BudgetCategorySchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	budgetedAmount: z.number(),
+	order: z.number(),
+});
+
+export type BudgetCategory = z.infer<typeof BudgetCategorySchema>;
+
+export const budgetCategoriesCollection = createCollection(
+	localStorageCollectionOptions({
+		id: "budget-categories",
+		storageKey: "budget-categories",
+		getKey: (category) => category.id,
+		schema: BudgetCategorySchema,
+	}),
+);
