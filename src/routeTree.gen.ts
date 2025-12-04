@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoTableRouteImport } from './routes/demo/table'
 import { Route as DemoDbChatApiRouteImport } from './routes/demo/db-chat-api'
@@ -28,6 +29,11 @@ import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ss
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/app/',
+  path: '/app/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/app': typeof AppIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
   '/demo/form/address': typeof DemoFormAddressRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/app': typeof AppIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
   '/demo/form/address': typeof DemoFormAddressRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
   '/demo/table': typeof DemoTableRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/app/': typeof AppIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
   '/demo/form/address': typeof DemoFormAddressRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/demo/db-chat-api'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/app'
     | '/demo/api/names'
     | '/demo/api/tq-todos'
     | '/demo/form/address'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/demo/db-chat-api'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/app'
     | '/demo/api/names'
     | '/demo/api/tq-todos'
     | '/demo/form/address'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/demo/db-chat-api'
     | '/demo/table'
     | '/demo/tanstack-query'
+    | '/app/'
     | '/demo/api/names'
     | '/demo/api/tq-todos'
     | '/demo/form/address'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   DemoDbChatApiRoute: typeof DemoDbChatApiRoute
   DemoTableRoute: typeof DemoTableRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  AppIndexRoute: typeof AppIndexRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoApiTqTodosRoute: typeof DemoApiTqTodosRoute
   DemoFormAddressRoute: typeof DemoFormAddressRoute
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/tanstack-query': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoDbChatApiRoute: DemoDbChatApiRoute,
   DemoTableRoute: DemoTableRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  AppIndexRoute: AppIndexRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoApiTqTodosRoute: DemoApiTqTodosRoute,
   DemoFormAddressRoute: DemoFormAddressRoute,
