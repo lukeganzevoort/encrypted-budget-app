@@ -22,11 +22,12 @@ const parseAmount = (amount: string | undefined): number => {
 	);
 };
 
-const parseDate = (rawDate: string) => {
+const parseDate = (rawDate: string): number => {
 	// Parse as UTC to avoid local timezone interpretation
 	const isoString = new Date(rawDate).toISOString();
 	console.log("isoString", isoString);
-	return new Date(isoString.split("T")[0]);
+	// Return Unix time (milliseconds since epoch)
+	return new Date(isoString.split("T")[0]).getTime();
 };
 
 function RouteComponent() {
@@ -139,7 +140,7 @@ function RouteComponent() {
 					<h2 className="text-xl font-semibold mb-4">
 						Transactions ({transactions.length} total)
 					</h2>
-					<div className="overflow-auto max-h-96 border rounded-lg">
+					<div className="overflow-auto border rounded-lg">
 						<table className="w-full">
 							<thead className="bg-gray-100 sticky top-0">
 								<tr>
@@ -149,28 +150,30 @@ function RouteComponent() {
 								</tr>
 							</thead>
 							<tbody>
-								{transactions.map((transaction) => (
-									<tr
-										key={transaction.id}
-										className="border-b hover:bg-gray-50"
-									>
-										<td className="p-3">
-											{new Date(transaction.date).getMonth() + 1}/
-											{new Date(transaction.date).getDate()}
-											{new Date(transaction.date).getUTCFullYear() ===
-											new Date().getUTCFullYear()
-												? ""
-												: `/${new Date(transaction.date).getUTCFullYear()}`}
-										</td>
-										<td className="p-3 text-xs text-gray-600">
-											{transaction.description}
-										</td>
-										<td className="p-3 text-right">
-											{transaction.amount < 0 && "-"}$
-											{Math.abs(transaction.amount).toFixed(2)}
-										</td>
-									</tr>
-								))}
+								{transactions
+									.sort((a, b) => a.date - b.date)
+									.map((transaction) => (
+										<tr
+											key={transaction.id}
+											className="border-b hover:bg-gray-50"
+										>
+											<td className="p-3">
+												{new Date(transaction.date).getMonth() + 1}/
+												{new Date(transaction.date).getDate()}
+												{new Date(transaction.date).getUTCFullYear() ===
+												new Date().getUTCFullYear()
+													? ""
+													: `/${new Date(transaction.date).getUTCFullYear()}`}
+											</td>
+											<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
+												{transaction.description.replaceAll("<br />", "\n")}
+											</td>
+											<td className="p-3 text-right">
+												{transaction.amount < 0 && "-"}$
+												{Math.abs(transaction.amount).toFixed(2)}
+											</td>
+										</tr>
+									))}
 							</tbody>
 						</table>
 					</div>
