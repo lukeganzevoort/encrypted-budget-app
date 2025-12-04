@@ -4,6 +4,14 @@ import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	budgetCategoriesCollection,
 	type Transaction,
 	transactionsCollection,
 } from "@/db-collections/index";
@@ -19,7 +27,7 @@ const parseAmount = (amount: string | undefined): number => {
 	if (!amount) return 0;
 	return Number.parseFloat(
 		amount.replace("$", "").replace(",", "").replace("(", "-").replace(")", ""),
-	)
+	);
 };
 
 const parseDate = (rawDate: string): number => {
@@ -42,7 +50,14 @@ function RouteComponent() {
 			.select(({ transaction }) => ({
 				...transaction,
 			})),
-	)
+	);
+
+	// Query budget categories from the database
+	const { data: budgetCategories } = useLiveQuery((q) =>
+		q.from({ category: budgetCategoriesCollection }).select(({ category }) => ({
+			...category,
+		})),
+	);
 
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -80,7 +95,7 @@ function RouteComponent() {
 						rawDate,
 						rawDescription,
 						rawAmount,
-					)
+					);
 
 					const amount = parseAmount(rawAmount);
 					const date = parseDate(rawDate);
@@ -90,7 +105,7 @@ function RouteComponent() {
 						date,
 						description: rawDescription,
 						amount,
-					}
+					};
 					try {
 						console.log("Inserting new transaction:", transaction);
 						transactionsCollection.insert(transaction);
@@ -107,12 +122,23 @@ function RouteComponent() {
 				console.error("Error parsing CSV:", error);
 				setIsLoading(false);
 			},
-		})
-	}
+		});
+	};
 
 	const handleButtonClick = () => {
 		fileInputRef.current?.click();
-	}
+	};
+
+	const handleCategoryChange = (transactionId: string, categoryId: string) => {
+		transactionsCollection.update(transactionId, (item) => {
+			item.categoryId = categoryId === "uncategorized" ? undefined : categoryId;
+		});
+	};
+
+	// Sort categories by name for the dropdown
+	const sortedCategories = budgetCategories
+		? [...budgetCategories].sort((a, b) => a.name.localeCompare(b.name))
+		: [];
 
 	return (
 		<div className="flex flex-col items-center p-10 h-screen">
@@ -136,7 +162,7 @@ function RouteComponent() {
 			)}
 
 			{transactions && transactions.length > 0 && (
-				<div className="mt-6 w-full max-w-4xl">
+				<div className="mt-6 w-full max-w-6xl">
 					<h2 className="text-xl font-semibold mb-4">
 						Transactions ({transactions.length} total)
 					</h2>
@@ -146,6 +172,7 @@ function RouteComponent() {
 								<tr>
 									<th className="text-left p-3 border-b">Date</th>
 									<th className="text-left p-3 border-b">Description</th>
+									<th className="text-left p-3 border-b">Category</th>
 									<th className="text-right p-3 border-b">Amount</th>
 								</tr>
 							</thead>
@@ -157,7 +184,7 @@ function RouteComponent() {
 											key={transaction.id}
 											className="border-b hover:bg-gray-50"
 										>
-											<td className="p-3">
+											<td className="p-3 whitespace-nowrap">
 												{new Date(transaction.date).getMonth() + 1}/
 												{new Date(transaction.date).getDate()}
 												{new Date(transaction.date).getUTCFullYear() ===
@@ -168,7 +195,32 @@ function RouteComponent() {
 											<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
 												{transaction.description.replaceAll("<br />", "\n")}
 											</td>
-											<td className="p-3 text-right">
+											<td className="p-3">
+												<Select
+													value={transaction.categoryId || "uncategorized"}
+													onValueChange={(value) =>
+														handleCategoryChange(transaction.id, value)
+													}
+												>
+													<SelectTrigger className="w-[180px]">
+														<SelectValue placeholder="Select category" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem
+															value="uncategorized"
+															className="text-gray-500"
+														>
+															Uncategorized
+														</SelectItem>
+														{sortedCategories.map((cat) => (
+															<SelectItem key={cat.id} value={cat.id}>
+																{cat.name}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+											</td>
+											<td className="p-3 text-right whitespace-nowrap">
 												{transaction.amount < 0 && "-"}$
 												{Math.abs(transaction.amount).toFixed(2)}
 											</td>
@@ -180,5 +232,5 @@ function RouteComponent() {
 				</div>
 			)}
 		</div>
-	)
+	);
 }
