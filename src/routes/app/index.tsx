@@ -122,7 +122,11 @@ function RouteComponent() {
 				accept=".csv"
 				className="hidden"
 			/>
-			<Button onClick={handleButtonClick} disabled={isLoading}>
+			<Button
+				className="ml-auto"
+				onClick={handleButtonClick}
+				disabled={isLoading}
+			>
 				{isLoading ? "Parsing..." : "Upload CSV File"}
 			</Button>
 
@@ -151,14 +155,16 @@ function RouteComponent() {
 										className="border-b hover:bg-gray-50"
 									>
 										<td className="p-3">
-											{transaction.date.getUTCMonth() + 1}/
-											{transaction.date.getUTCDate()}
-											{transaction.date.getUTCFullYear() ===
+											{new Date(transaction.date).getMonth() + 1}/
+											{new Date(transaction.date).getDate()}
+											{new Date(transaction.date).getUTCFullYear() ===
 											new Date().getUTCFullYear()
 												? ""
-												: `/${transaction.date.getUTCFullYear()}`}
+												: `/${new Date(transaction.date).getUTCFullYear()}`}
 										</td>
-										<td className="p-3">{transaction.description}</td>
+										<td className="p-3 text-xs text-gray-600">
+											{transaction.description}
+										</td>
 										<td className="p-3 text-right">
 											{transaction.amount < 0 && "-"}$
 											{Math.abs(transaction.amount).toFixed(2)}
