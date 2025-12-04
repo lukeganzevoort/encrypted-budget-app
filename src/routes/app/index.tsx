@@ -53,25 +53,32 @@ function RouteComponent() {
 
 				// Insert parsed data into transactions collection
 				for (const row of results.data) {
-					// Generate a unique ID for each transaction
-					const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+					const date = row.date || row.Date || "";
+					const description = row.description || row.Description || "";
+					const amount = Number.parseFloat(
+						(row.amount || row.Amount || "0")
+							.replace("$", "")
+							.replace(",", "")
+							.replace("(", "-")
+							.replace(")", ""),
+					);
 
-					// Map CSV columns to transaction schema
+					// Create a unique ID based on transaction data
+					// TODO: use a better hash function
+					const uniqueId = `${date}-${description}-${amount}`;
+
 					const transaction: Transaction = {
-						id,
-						date: row.date || row.Date || "",
-						description: row.description || row.Description || "",
-						amount: Number.parseFloat(
-							(row.amount || row.Amount || "0")
-								.replace("$", "")
-								.replace(",", "")
-								.replace("(", "-")
-								.replace(")", ""),
-						),
+						id: uniqueId,
+						date,
+						description,
+						amount,
 					};
-					console.log("Inserting transaction:", transaction);
-
-					transactionsCollection.insert(transaction);
+					try {
+						console.log("Inserting new transaction:", transaction);
+						transactionsCollection.insert(transaction);
+					} catch (error) {
+						console.error("Error inserting transaction:", error);
+					}
 				}
 
 				setIsLoading(false);
@@ -129,7 +136,8 @@ function RouteComponent() {
 										<td className="p-3">{transaction.date}</td>
 										<td className="p-3">{transaction.description}</td>
 										<td className="p-3 text-right">
-											${transaction.amount.toFixed(2)}
+											{transaction.amount < 0 && "-"}$
+											{Math.abs(transaction.amount).toFixed(2)}
 										</td>
 									</tr>
 								))}
