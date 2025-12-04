@@ -2,10 +2,6 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { LabelList, Pie, PieChart } from "recharts";
 import {
-	budgetCategoriesCollection,
-	transactionsCollection,
-} from "@/db-collections/index";
-import {
 	Card,
 	CardContent,
 	CardDescription,
@@ -18,31 +14,39 @@ import {
 	ChartTooltip,
 	ChartTooltipContent,
 } from "@/components/ui/chart";
+import {
+	budgetCategoriesCollection,
+	transactionsCollection,
+} from "@/db-collections/index";
 
 export const Route = createFileRoute("/app/overview")({
 	component: RouteComponent,
 });
 
-// Generate colors for categories
+// Generate distinct colors for categories
 const CHART_COLORS = [
-	"hsl(var(--chart-1))",
-	"hsl(var(--chart-2))",
-	"hsl(var(--chart-3))",
-	"hsl(var(--chart-4))",
-	"hsl(var(--chart-5))",
-	"hsl(12, 76%, 61%)",
-	"hsl(173, 58%, 39%)",
-	"hsl(197, 37%, 24%)",
-	"hsl(43, 74%, 66%)",
-	"hsl(27, 87%, 67%)",
+	"#3b82f6", // blue
+	"#10b981", // emerald
+	"#f59e0b", // amber
+	"#ef4444", // red
+	"#8b5cf6", // violet
+	"#ec4899", // pink
+	"#06b6d4", // cyan
+	"#f97316", // orange
+	"#14b8a6", // teal
+	"#6366f1", // indigo
+	"#a855f7", // purple
+	"#eab308", // yellow
 ];
 
 function RouteComponent() {
 	// Query transactions from the database
 	const { data: transactions } = useLiveQuery((q) =>
-		q.from({ transaction: transactionsCollection }).select(({ transaction }) => ({
-			...transaction,
-		})),
+		q
+			.from({ transaction: transactionsCollection })
+			.select(({ transaction }) => ({
+				...transaction,
+			})),
 	);
 
 	// Query budget categories from the database
@@ -98,7 +102,7 @@ function RouteComponent() {
 		chartData.push({
 			category: "Uncategorized",
 			amount: uncategorizedTotal,
-			fill: "hsl(var(--muted))",
+			fill: "#9ca3af", // gray-400
 			categoryId: "uncategorized",
 		});
 	}
@@ -125,10 +129,8 @@ function RouteComponent() {
 
 	// Calculate statistics
 	const totalTransactions = transactions?.length || 0;
-	const expenseCount =
-		transactions?.filter((t) => t.amount < 0).length || 0;
-	const incomeCount =
-		transactions?.filter((t) => t.amount > 0).length || 0;
+	const expenseCount = transactions?.filter((t) => t.amount < 0).length || 0;
+	const incomeCount = transactions?.filter((t) => t.amount > 0).length || 0;
 	const totalIncome =
 		transactions
 			?.filter((t) => t.amount > 0)
