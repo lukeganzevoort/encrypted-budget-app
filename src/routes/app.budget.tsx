@@ -21,13 +21,46 @@ const BUDGET_SETTINGS_ID = "default-budget-settings";
 
 const DEFAULT_INCOME = 5000;
 const DEFAULT_CATEGORIES = [
-	{ name: "Giving", amount: 500 },
-	{ name: "Saving", amount: 750 },
-	{ name: "Groceries", amount: 500 },
-	{ name: "Mortgage", amount: 1500 },
-	{ name: "Bills", amount: 1000 },
-	{ name: "Transportation", amount: 400 },
-	{ name: "Spending", amount: 350 },
+	{ name: "Giving", amount: 500, emoji: "💝" },
+	{ name: "Saving", amount: 750, emoji: "💰" },
+	{ name: "Groceries", amount: 500, emoji: "🛒" },
+	{ name: "Home", amount: 1500, emoji: "🏠" },
+	{ name: "Bills", amount: 1000, emoji: "💡" },
+	{ name: "Transportation", amount: 400, emoji: "🚗" },
+	{ name: "Spending", amount: 350, emoji: "💳" },
+];
+
+const COMMON_EMOJIS = [
+	"💰",
+	"💵",
+	"💳",
+	"🏠",
+	"🚗",
+	"🛒",
+	"🍔",
+	"💡",
+	"📱",
+	"🎮",
+	"🎬",
+	"🎵",
+	"📚",
+	"💊",
+	"🏥",
+	"✈️",
+	"🏖️",
+	"🎓",
+	"💝",
+	"👕",
+	"🍕",
+	"☕",
+	"🐕",
+	"🐈",
+	"🌟",
+	"⚽",
+	"🎨",
+	"🔧",
+	"💼",
+	"🎁",
 ];
 
 function RouteComponent() {
@@ -35,8 +68,10 @@ function RouteComponent() {
 	const [monthlyIncome, setMonthlyIncome] = useState<string>("");
 	const [newCategoryName, setNewCategoryName] = useState<string>("");
 	const [newCategoryAmount, setNewCategoryAmount] = useState<string>("");
+	const [newCategoryEmoji, setNewCategoryEmoji] = useState<string>("💵");
 	const [categories, setCategories] = useState<BudgetCategory[]>([]);
 	const [isInitialized, setIsInitialized] = useState(false);
+	const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
 
 	// Query budget settings from the database
 	const { data: budgetSettingsData } = useLiveQuery((q) =>
@@ -80,6 +115,7 @@ function RouteComponent() {
 						name: defaultCat.name,
 						budgetedAmount: defaultCat.amount,
 						order: i,
+						emoji: defaultCat.emoji,
 					};
 					budgetCategoriesCollection.insert(category);
 				}
@@ -143,11 +179,13 @@ function RouteComponent() {
 			name: newCategoryName,
 			budgetedAmount: amount,
 			order,
+			emoji: newCategoryEmoji,
 		};
 
 		budgetCategoriesCollection.insert(category);
 		setNewCategoryName("");
 		setNewCategoryAmount("");
+		setNewCategoryEmoji("💰");
 	};
 
 	const handleDeleteCategory = (categoryId: string) => {
@@ -163,6 +201,13 @@ function RouteComponent() {
 		budgetCategoriesCollection.update(categoryId, (item) => {
 			item.budgetedAmount = amount;
 		});
+	};
+
+	const handleUpdateEmoji = (categoryId: string, emoji: string) => {
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.emoji = emoji;
+		});
+		setShowEmojiPicker(null);
 	};
 
 	// Calculate totals
@@ -243,6 +288,37 @@ function RouteComponent() {
 						Add New Category
 					</h3>
 					<div className="flex gap-3">
+						<div className="relative">
+							<Button
+								type="button"
+								variant="outline"
+								className="h-10 w-12 text-2xl p-0"
+								onClick={() =>
+									setShowEmojiPicker(showEmojiPicker === "new" ? null : "new")
+								}
+							>
+								{newCategoryEmoji}
+							</Button>
+							{showEmojiPicker === "new" && (
+								<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
+									<div className="grid grid-cols-6 gap-2 w-64">
+										{COMMON_EMOJIS.map((emoji) => (
+											<button
+												key={emoji}
+												type="button"
+												onClick={() => {
+													setNewCategoryEmoji(emoji);
+													setShowEmojiPicker(null);
+												}}
+												className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
+											>
+												{emoji}
+											</button>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
 						<div className="flex-1">
 							<Input
 								type="text"
@@ -287,6 +363,38 @@ function RouteComponent() {
 								key={category.id}
 								className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
 							>
+								<div className="relative">
+									<Button
+										type="button"
+										variant="ghost"
+										className="h-10 w-12 text-2xl p-0 hover:bg-gray-200"
+										onClick={() =>
+											setShowEmojiPicker(
+												showEmojiPicker === category.id ? null : category.id,
+											)
+										}
+									>
+										{category.emoji || "📦"}
+									</Button>
+									{showEmojiPicker === category.id && (
+										<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
+											<div className="grid grid-cols-6 gap-2 w-64">
+												{COMMON_EMOJIS.map((emoji) => (
+													<button
+														key={emoji}
+														type="button"
+														onClick={() =>
+															handleUpdateEmoji(category.id, emoji)
+														}
+														className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
+													>
+														{emoji}
+													</button>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
 								<div className="flex-1">
 									<div className="font-medium text-gray-900">
 										{category.name}
