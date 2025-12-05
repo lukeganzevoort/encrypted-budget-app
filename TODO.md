@@ -1,5 +1,33 @@
 # Goal: Publish app as a SaaS product
 
+## Timeline: 3 months
+
+**Month 1: Phase 1 - MVP for Personal Use**
+
+December, 2025
+
+- Weeks 1-2: Core features + Database migration to Turso
+- Week 3: Encryption implementation + CSV improvements
+- Week 4: Analytics, reporting, and Phase 1 polish
+
+**Month 2: Phase 2 - Multi-User SaaS**
+
+January, 2026
+
+- Week 1: Authentication system + API foundation
+- Week 2: Landing & marketing pages
+- Weeks 3-4: Multi-tenant backend + Beta launch
+
+**Month 3: Phase 3 - Monetization & Launch**
+
+February, 2026
+
+- Week 1: Stripe integration + subscription tiers
+- Week 2: PWA conversion + advanced features
+- Weeks 3-4: Beta feedback implementation + Public launch
+
+**Target Launch Date: March 4, 2026**
+
 # Phase 1: Use product for self-use (MVP - Personal Use)
 
 ## Core Features:
