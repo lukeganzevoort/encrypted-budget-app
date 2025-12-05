@@ -32,7 +32,7 @@ February, 2026
 
 ## Core Features:
 
-- [ ] Add icons to budgets
+- [x] Add icons and colors to budgets
 - [ ] Allow split transactions between multiple budgets
 - [ ] Allow linked transactions between multiple transactions
 - [ ] Allow for account specification when uploading transactions
