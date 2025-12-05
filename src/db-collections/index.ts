@@ -60,7 +60,8 @@ const BudgetCategorySchema = z.object({
 	name: z.string(),
 	budgetedAmount: z.number(),
 	order: z.number(),
-	emoji: z.string().optional(),
+	icon: z.string().optional(),
+	color: z.string().optional(),
 });
 
 export type BudgetCategory = z.infer<typeof BudgetCategorySchema>;

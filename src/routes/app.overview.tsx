@@ -1,5 +1,30 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import {
+	Book,
+	Briefcase,
+	Car,
+	Cat,
+	Coffee,
+	CreditCard,
+	Dog,
+	Dumbbell,
+	Film,
+	Gift,
+	GraduationCap,
+	Heart,
+	Home,
+	Lightbulb,
+	type LucideIcon,
+	Music,
+	PiggyBank,
+	Plane,
+	Shirt,
+	ShoppingCart,
+	Sparkles,
+	Utensils,
+	Wallet,
+} from "lucide-react";
 import { LabelList, Pie, PieChart } from "recharts";
 import {
 	Card,
@@ -38,6 +63,31 @@ const CHART_COLORS = [
 	"#a855f7", // purple
 	"#eab308", // yellow
 ];
+
+const AVAILABLE_ICONS: Record<string, LucideIcon> = {
+	Heart,
+	PiggyBank,
+	ShoppingCart,
+	Home,
+	Lightbulb,
+	Car,
+	CreditCard,
+	Utensils,
+	Coffee,
+	Plane,
+	GraduationCap,
+	Briefcase,
+	Dumbbell,
+	Music,
+	Film,
+	Book,
+	Shirt,
+	Gift,
+	Dog,
+	Cat,
+	Sparkles,
+	Wallet,
+};
 
 function RouteComponent() {
 	// Query transactions from the database
@@ -90,7 +140,7 @@ function RouteComponent() {
 			chartData.push({
 				category: category.name,
 				amount,
-				fill: CHART_COLORS[colorIndex % CHART_COLORS.length],
+				fill: category.color || CHART_COLORS[colorIndex % CHART_COLORS.length],
 				categoryId,
 			});
 			colorIndex++;
@@ -246,14 +296,28 @@ function RouteComponent() {
 							<div className="space-y-4">
 								{chartData.map((item) => {
 									const percentage = (item.amount / totalSpending) * 100;
+									const category = budgetCategories?.find(
+										(c) => c.id === item.categoryId,
+									);
+									const IconComponent =
+										category && AVAILABLE_ICONS[category.icon || "Wallet"]
+											? AVAILABLE_ICONS[category.icon || "Wallet"]
+											: Wallet;
 									return (
 										<div key={item.categoryId}>
 											<div className="flex items-center justify-between mb-1">
 												<div className="flex items-center gap-2">
-													<div
-														className="w-3 h-3 rounded-full"
-														style={{ backgroundColor: item.fill }}
-													/>
+													{category ? (
+														<IconComponent
+															style={{ color: item.fill }}
+															size={16}
+														/>
+													) : (
+														<div
+															className="w-3 h-3 rounded-full"
+															style={{ backgroundColor: item.fill }}
+														/>
+													)}
 													<span className="font-medium">{item.category}</span>
 												</div>
 												<span className="text-sm font-medium">

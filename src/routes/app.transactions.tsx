@@ -1,5 +1,30 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import {
+	Heart,
+	PiggyBank,
+	ShoppingCart,
+	Home,
+	Lightbulb,
+	Car,
+	CreditCard,
+	Utensils,
+	Coffee,
+	Plane,
+	GraduationCap,
+	Briefcase,
+	Dumbbell,
+	Music,
+	Film,
+	Book,
+	Shirt,
+	Gift,
+	Dog,
+	Cat,
+	Sparkles,
+	Wallet,
+	type LucideIcon,
+} from "lucide-react";
 import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +45,31 @@ import { generateTransactionHash } from "@/lib/utils";
 export const Route = createFileRoute("/app/transactions")({
 	component: RouteComponent,
 });
+
+const AVAILABLE_ICONS: Record<string, LucideIcon> = {
+	Heart,
+	PiggyBank,
+	ShoppingCart,
+	Home,
+	Lightbulb,
+	Car,
+	CreditCard,
+	Utensils,
+	Coffee,
+	Plane,
+	GraduationCap,
+	Briefcase,
+	Dumbbell,
+	Music,
+	Film,
+	Book,
+	Shirt,
+	Gift,
+	Dog,
+	Cat,
+	Sparkles,
+	Wallet,
+};
 
 type CsvRow = Record<string, string | undefined>;
 
@@ -202,8 +252,33 @@ function RouteComponent() {
 														handleCategoryChange(transaction.id, value)
 													}
 												>
-													<SelectTrigger className="w-[180px]">
-														<SelectValue placeholder="Select category" />
+													<SelectTrigger className="w-[200px]">
+														<SelectValue placeholder="Select category">
+															{(() => {
+																if (
+																	!transaction.categoryId ||
+																	transaction.categoryId === "uncategorized"
+																) {
+																	return "Uncategorized";
+																}
+																const cat = sortedCategories.find(
+																	(c) => c.id === transaction.categoryId,
+																);
+																if (!cat) return "Uncategorized";
+																const IconComponent =
+																	AVAILABLE_ICONS[cat.icon || "Wallet"] ||
+																	Wallet;
+																return (
+																	<div className="flex items-center gap-2">
+																		<IconComponent
+																			style={{ color: cat.color || "#3b82f6" }}
+																			size={16}
+																		/>
+																		<span>{cat.name}</span>
+																	</div>
+																);
+															})()}
+														</SelectValue>
 													</SelectTrigger>
 													<SelectContent>
 														<SelectItem
@@ -212,11 +287,21 @@ function RouteComponent() {
 														>
 															Uncategorized
 														</SelectItem>
-														{sortedCategories.map((cat) => (
-															<SelectItem key={cat.id} value={cat.id}>
-																{cat.name}
-															</SelectItem>
-														))}
+														{sortedCategories.map((cat) => {
+															const IconComponent =
+																AVAILABLE_ICONS[cat.icon || "Wallet"] || Wallet;
+															return (
+																<SelectItem key={cat.id} value={cat.id}>
+																	<div className="flex items-center gap-2">
+																		<IconComponent
+																			style={{ color: cat.color || "#3b82f6" }}
+																			size={16}
+																		/>
+																		<span>{cat.name}</span>
+																	</div>
+																</SelectItem>
+															);
+														})}
 													</SelectContent>
 												</Select>
 											</td>

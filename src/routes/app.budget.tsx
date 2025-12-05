@@ -1,10 +1,41 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import {
+	Book,
+	Briefcase,
+	Car,
+	Cat,
+	Coffee,
+	CreditCard,
+	Dog,
+	Dumbbell,
+	Film,
+	Gift,
+	GraduationCap,
+	Heart,
+	Home,
+	Lightbulb,
+	type LucideIcon,
+	Music,
+	PiggyBank,
+	Plane,
+	Plus,
+	Shirt,
+	ShoppingCart,
+	Sparkles,
+	Trash2,
+	Utensils,
+	Wallet,
+} from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	type BudgetCategory,
 	type BudgetSettings,
@@ -21,46 +52,59 @@ const BUDGET_SETTINGS_ID = "default-budget-settings";
 
 const DEFAULT_INCOME = 5000;
 const DEFAULT_CATEGORIES = [
-	{ name: "Giving", amount: 500, emoji: "💝" },
-	{ name: "Saving", amount: 750, emoji: "💰" },
-	{ name: "Groceries", amount: 500, emoji: "🛒" },
-	{ name: "Home", amount: 1500, emoji: "🏠" },
-	{ name: "Bills", amount: 1000, emoji: "💡" },
-	{ name: "Transportation", amount: 400, emoji: "🚗" },
-	{ name: "Spending", amount: 350, emoji: "💳" },
+	{ name: "Giving", amount: 500, icon: "Heart", color: "#ec4899" },
+	{ name: "Saving", amount: 750, icon: "PiggyBank", color: "#10b981" },
+	{ name: "Groceries", amount: 500, icon: "ShoppingCart", color: "#f97316" },
+	{ name: "Home", amount: 1500, icon: "Home", color: "#3b82f6" },
+	{ name: "Bills", amount: 1000, icon: "Lightbulb", color: "#eab308" },
+	{ name: "Transportation", amount: 400, icon: "Car", color: "#a855f7" },
+	{ name: "Spending", amount: 350, icon: "CreditCard", color: "#14b8a6" },
 ];
 
-const COMMON_EMOJIS = [
-	"💰",
-	"💵",
-	"💳",
-	"🏠",
-	"🚗",
-	"🛒",
-	"🍔",
-	"💡",
-	"📱",
-	"🎮",
-	"🎬",
-	"🎵",
-	"📚",
-	"💊",
-	"🏥",
-	"✈️",
-	"🏖️",
-	"🎓",
-	"💝",
-	"👕",
-	"🍕",
-	"☕",
-	"🐕",
-	"🐈",
-	"🌟",
-	"⚽",
-	"🎨",
-	"🔧",
-	"💼",
-	"🎁",
+const AVAILABLE_ICONS: Record<string, LucideIcon> = {
+	Heart,
+	PiggyBank,
+	ShoppingCart,
+	Home,
+	Lightbulb,
+	Car,
+	CreditCard,
+	Utensils,
+	Coffee,
+	Plane,
+	GraduationCap,
+	Briefcase,
+	Dumbbell,
+	Music,
+	Film,
+	Book,
+	Shirt,
+	Gift,
+	Dog,
+	Cat,
+	Sparkles,
+	Wallet,
+};
+
+const AVAILABLE_COLORS = [
+	// Row 1: Light shades
+	{ name: "Red Light", value: "#fca5a5", group: "Red" },
+	{ name: "Orange Light", value: "#fdba74", group: "Orange" },
+	{ name: "Yellow Light", value: "#fde047", group: "Yellow" },
+	{ name: "Green Light", value: "#86efac", group: "Green" },
+	{ name: "Teal Light", value: "#5eead4", group: "Teal" },
+	{ name: "Blue Light", value: "#93c5fd", group: "Blue" },
+	{ name: "Purple Light", value: "#c4b5fd", group: "Purple" },
+	{ name: "Pink Light", value: "#f9a8d4", group: "Pink" },
+	// Row 2: Dark shades
+	{ name: "Red Dark", value: "#b91c1c", group: "Red" },
+	{ name: "Orange Dark", value: "#c2410c", group: "Orange" },
+	{ name: "Yellow Dark", value: "#a16207", group: "Yellow" },
+	{ name: "Green Dark", value: "#15803d", group: "Green" },
+	{ name: "Teal Dark", value: "#0f766e", group: "Teal" },
+	{ name: "Blue Dark", value: "#1e40af", group: "Blue" },
+	{ name: "Purple Dark", value: "#6d28d9", group: "Purple" },
+	{ name: "Pink Dark", value: "#be185d", group: "Pink" },
 ];
 
 function RouteComponent() {
@@ -68,10 +112,11 @@ function RouteComponent() {
 	const [monthlyIncome, setMonthlyIncome] = useState<string>("");
 	const [newCategoryName, setNewCategoryName] = useState<string>("");
 	const [newCategoryAmount, setNewCategoryAmount] = useState<string>("");
-	const [newCategoryEmoji, setNewCategoryEmoji] = useState<string>("💵");
+	const [newCategoryIcon, setNewCategoryIcon] = useState<string>("Wallet");
+	const [newCategoryColor, setNewCategoryColor] = useState<string>("#3b82f6");
 	const [categories, setCategories] = useState<BudgetCategory[]>([]);
 	const [isInitialized, setIsInitialized] = useState(false);
-	const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 	const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
 		null,
 	);
@@ -119,7 +164,8 @@ function RouteComponent() {
 						name: defaultCat.name,
 						budgetedAmount: defaultCat.amount,
 						order: i,
-						emoji: defaultCat.emoji,
+						icon: defaultCat.icon,
+						color: defaultCat.color,
 					};
 					budgetCategoriesCollection.insert(category);
 				}
@@ -183,13 +229,15 @@ function RouteComponent() {
 			name: newCategoryName,
 			budgetedAmount: amount,
 			order,
-			emoji: newCategoryEmoji,
+			icon: newCategoryIcon,
+			color: newCategoryColor,
 		};
 
 		budgetCategoriesCollection.insert(category);
 		setNewCategoryName("");
 		setNewCategoryAmount("");
-		setNewCategoryEmoji("💰");
+		setNewCategoryIcon("Wallet");
+		setNewCategoryColor("#3b82f6");
 	};
 
 	const handleDeleteCategory = (categoryId: string) => {
@@ -207,11 +255,16 @@ function RouteComponent() {
 		});
 	};
 
-	const handleUpdateEmoji = (categoryId: string, emoji: string) => {
+	const handleUpdateIcon = (categoryId: string, icon: string) => {
 		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.emoji = emoji;
+			item.icon = icon;
 		});
-		setShowEmojiPicker(null);
+	};
+
+	const handleUpdateColor = (categoryId: string, color: string) => {
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.color = color;
+		});
 	};
 
 	const handleStartEditingName = (categoryId: string, currentName: string) => {
@@ -312,92 +365,145 @@ function RouteComponent() {
 				{/* Categories List */}
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
-						{sortedCategories.map((category) => (
-							<div
-								key={category.id}
-								className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-							>
-								<div className="relative">
-									<Button
-										type="button"
-										variant="ghost"
-										className="h-10 w-12 text-2xl p-0 hover:bg-gray-200"
-										onClick={() =>
-											setShowEmojiPicker(
-												showEmojiPicker === category.id ? null : category.id,
-											)
+						{sortedCategories.map((category) => {
+							const IconComponent =
+								AVAILABLE_ICONS[category.icon || "Wallet"] || Wallet;
+							const iconColor = category.color || "#3b82f6";
+							return (
+								<div
+									key={category.id}
+									className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+								>
+									<Popover
+										open={openPopoverId === category.id}
+										onOpenChange={(open) =>
+											setOpenPopoverId(open ? category.id : null)
 										}
 									>
-										{category.emoji || "📦"}
-									</Button>
-									{showEmojiPicker === category.id && (
-										<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
-											<div className="grid grid-cols-6 gap-2 w-64">
-												{COMMON_EMOJIS.map((emoji) => (
-													<button
-														key={emoji}
-														type="button"
-														onClick={() =>
-															handleUpdateEmoji(category.id, emoji)
-														}
-														className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
-													>
-														{emoji}
-													</button>
-												))}
+										<PopoverTrigger asChild>
+											<Button
+												variant="ghost"
+												className="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
+											>
+												<IconComponent
+													style={{ color: iconColor }}
+													size={24}
+													className="size-5"
+												/>
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent className="w-80" align="start">
+											<div className="mb-4">
+												<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+													Select Color
+												</h4>
+												<div className="grid grid-cols-8 gap-1">
+													{AVAILABLE_COLORS.map((color) => (
+														<button
+															key={color.value}
+															type="button"
+															onClick={() =>
+																handleUpdateColor(category.id, color.value)
+															}
+															className={`h-8 rounded transition-all ${
+																category.color === color.value
+																	? "ring-2 ring-gray-800 ring-offset-1"
+																	: "hover:scale-105"
+															}`}
+															style={{ backgroundColor: color.value }}
+															title={color.name}
+														/>
+													))}
+												</div>
 											</div>
-										</div>
-									)}
-								</div>
-								<div className="flex-1">
-									{editingCategoryId === category.id ? (
-										<Input
-											type="text"
-											value={editingCategoryName}
-											onChange={(e) => setEditingCategoryName(e.target.value)}
-											onBlur={() => handleSaveCategoryName(category.id)}
-											onKeyDown={(e) => {
-												if (e.key === "Enter") {
-													handleSaveCategoryName(category.id);
-												} else if (e.key === "Escape") {
-													handleCancelEditingName();
+											<div className="border-t pt-4">
+												<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+													Select Icon
+												</h4>
+												<div className="grid grid-cols-5 gap-2">
+													{Object.entries(AVAILABLE_ICONS).map(
+														([name, Icon]) => (
+															<Button
+																key={name}
+																variant="ghost"
+																size="icon"
+																onClick={() =>
+																	handleUpdateIcon(category.id, name)
+																}
+																className={`hover:bg-gray-100 rounded p-2 transition-colors ${
+																	category.icon === name
+																		? "bg-gray-200 ring-2 ring-gray-500"
+																		: ""
+																}`}
+																title={name}
+															>
+																<Icon size={20} />
+															</Button>
+														),
+													)}
+												</div>
+											</div>
+											<div className="mt-4 pt-3 border-t flex justify-end">
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => setOpenPopoverId(null)}
+												>
+													Done
+												</Button>
+											</div>
+										</PopoverContent>
+									</Popover>
+									<div className="flex-1">
+										{editingCategoryId === category.id ? (
+											<Input
+												type="text"
+												value={editingCategoryName}
+												onChange={(e) => setEditingCategoryName(e.target.value)}
+												onBlur={() => handleSaveCategoryName(category.id)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														handleSaveCategoryName(category.id);
+													} else if (e.key === "Escape") {
+														handleCancelEditingName();
+													}
+												}}
+												autoFocus
+												className="font-medium"
+											/>
+										) : (
+											<button
+												type="button"
+												className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
+												onClick={() =>
+													handleStartEditingName(category.id, category.name)
 												}
-											}}
-											autoFocus
-											className="font-medium"
-										/>
-									) : (
-										<button
-											type="button"
-											className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
-											onClick={() =>
-												handleStartEditingName(category.id, category.name)
+											>
+												{category.name}
+											</button>
+										)}
+									</div>
+									<div className="w-40">
+										<Input
+											type="number"
+											value={category.budgetedAmount}
+											onChange={(e) =>
+												handleUpdateCategory(category.id, e.target.value)
 											}
-										>
-											{category.name}
-										</button>
-									)}
+											className="text-right"
+										/>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => handleDeleteCategory(category.id)}
+										className="flex items-center gap-1 hover:text-red-500"
+									>
+										<Trash2 size={16} />
+									</Button>
 								</div>
-								<div className="w-40">
-									<Input
-										type="number"
-										value={category.budgetedAmount}
-										onChange={(e) =>
-											handleUpdateCategory(category.id, e.target.value)
-										}
-										className="text-right"
-									/>
-								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => handleDeleteCategory(category.id)}
-									className="flex items-center gap-1 hover:text-red-500"
-								>
-									<Trash2 size={16} />
-								</Button>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				) : (
 					<div className="text-center py-8 text-gray-500">
@@ -411,37 +517,85 @@ function RouteComponent() {
 						Add New Category
 					</h3>
 					<div className="flex gap-3">
-						<div className="relative">
-							<Button
-								type="button"
-								variant="outline"
-								className="h-10 w-12 text-2xl p-0"
-								onClick={() =>
-									setShowEmojiPicker(showEmojiPicker === "new" ? null : "new")
-								}
-							>
-								{newCategoryEmoji}
-							</Button>
-							{showEmojiPicker === "new" && (
-								<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
-									<div className="grid grid-cols-6 gap-2 w-64">
-										{COMMON_EMOJIS.map((emoji) => (
+						<Popover
+							open={openPopoverId === "new"}
+							onOpenChange={(open) => setOpenPopoverId(open ? "new" : null)}
+						>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									className="h-12 w-12 p-0 rounded-full"
+								>
+									{(() => {
+										const NewIconComponent =
+											AVAILABLE_ICONS[newCategoryIcon] || Wallet;
+										return (
+											<NewIconComponent
+												style={{ color: newCategoryColor }}
+												size={20}
+												className="size-5"
+											/>
+										);
+									})()}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-80" align="start">
+								<div className="mb-4">
+									<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+										Select Color
+									</h4>
+									<div className="grid grid-cols-8 gap-1">
+										{AVAILABLE_COLORS.map((color) => (
 											<button
-												key={emoji}
+												key={color.value}
 												type="button"
-												onClick={() => {
-													setNewCategoryEmoji(emoji);
-													setShowEmojiPicker(null);
-												}}
-												className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
-											>
-												{emoji}
-											</button>
+												onClick={() => setNewCategoryColor(color.value)}
+												className={`h-8 rounded transition-all ${
+													newCategoryColor === color.value
+														? "ring-2 ring-gray-800 ring-offset-1"
+														: "hover:scale-105"
+												}`}
+												style={{ backgroundColor: color.value }}
+												title={color.name}
+											/>
 										))}
 									</div>
 								</div>
-							)}
-						</div>
+								<div className="border-t pt-4">
+									<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+										Select Icon
+									</h4>
+									<div className="grid grid-cols-5 gap-2">
+										{Object.entries(AVAILABLE_ICONS).map(([name, Icon]) => (
+											<Button
+												key={name}
+												variant="ghost"
+												size="icon"
+												onClick={() => setNewCategoryIcon(name)}
+												className={`hover:bg-gray-100 rounded p-2 transition-colors ${
+													newCategoryIcon === name
+														? "bg-gray-200 ring-2 ring-gray-500"
+														: ""
+												}`}
+												title={name}
+											>
+												<Icon style={{ color: newCategoryColor }} size={20} />
+											</Button>
+										))}
+									</div>
+								</div>
+								<div className="mt-4 pt-3 border-t flex justify-end">
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => setOpenPopoverId(null)}
+									>
+										Done
+									</Button>
+								</div>
+							</PopoverContent>
+						</Popover>
 						<div className="flex-1">
 							<Input
 								type="text"
