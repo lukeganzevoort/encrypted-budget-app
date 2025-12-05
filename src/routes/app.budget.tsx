@@ -72,6 +72,10 @@ function RouteComponent() {
 	const [categories, setCategories] = useState<BudgetCategory[]>([]);
 	const [isInitialized, setIsInitialized] = useState(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+	const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+		null,
+	);
+	const [editingCategoryName, setEditingCategoryName] = useState<string>("");
 
 	// Query budget settings from the database
 	const { data: budgetSettingsData } = useLiveQuery((q) =>
@@ -210,6 +214,29 @@ function RouteComponent() {
 		setShowEmojiPicker(null);
 	};
 
+	const handleStartEditingName = (categoryId: string, currentName: string) => {
+		setEditingCategoryId(categoryId);
+		setEditingCategoryName(currentName);
+	};
+
+	const handleSaveCategoryName = (categoryId: string) => {
+		if (!editingCategoryName.trim()) {
+			alert("Category name cannot be empty");
+			return;
+		}
+
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.name = editingCategoryName.trim();
+		});
+		setEditingCategoryId(null);
+		setEditingCategoryName("");
+	};
+
+	const handleCancelEditingName = () => {
+		setEditingCategoryId(null);
+		setEditingCategoryName("");
+	};
+
 	// Calculate totals
 	const currentIncome = budgetSettingsData?.[0]?.monthlyIncome || 0;
 	const totalBudgeted = categories.reduce(
@@ -282,8 +309,104 @@ function RouteComponent() {
 			<div className="mb-8 p-6 bg-white border rounded-lg shadow-sm">
 				<h2 className="text-xl font-semibold mb-4">Budget Categories</h2>
 
+				{/* Categories List */}
+				{sortedCategories.length > 0 ? (
+					<div className="space-y-2 mb-6">
+						{sortedCategories.map((category) => (
+							<div
+								key={category.id}
+								className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+							>
+								<div className="relative">
+									<Button
+										type="button"
+										variant="ghost"
+										className="h-10 w-12 text-2xl p-0 hover:bg-gray-200"
+										onClick={() =>
+											setShowEmojiPicker(
+												showEmojiPicker === category.id ? null : category.id,
+											)
+										}
+									>
+										{category.emoji || "📦"}
+									</Button>
+									{showEmojiPicker === category.id && (
+										<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
+											<div className="grid grid-cols-6 gap-2 w-64">
+												{COMMON_EMOJIS.map((emoji) => (
+													<button
+														key={emoji}
+														type="button"
+														onClick={() =>
+															handleUpdateEmoji(category.id, emoji)
+														}
+														className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
+													>
+														{emoji}
+													</button>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+								<div className="flex-1">
+									{editingCategoryId === category.id ? (
+										<Input
+											type="text"
+											value={editingCategoryName}
+											onChange={(e) => setEditingCategoryName(e.target.value)}
+											onBlur={() => handleSaveCategoryName(category.id)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													handleSaveCategoryName(category.id);
+												} else if (e.key === "Escape") {
+													handleCancelEditingName();
+												}
+											}}
+											autoFocus
+											className="font-medium"
+										/>
+									) : (
+										<button
+											type="button"
+											className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
+											onClick={() =>
+												handleStartEditingName(category.id, category.name)
+											}
+										>
+											{category.name}
+										</button>
+									)}
+								</div>
+								<div className="w-40">
+									<Input
+										type="number"
+										value={category.budgetedAmount}
+										onChange={(e) =>
+											handleUpdateCategory(category.id, e.target.value)
+										}
+										className="text-right"
+									/>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleDeleteCategory(category.id)}
+									className="flex items-center gap-1 hover:text-red-500"
+								>
+									<Trash2 size={16} />
+								</Button>
+							</div>
+						))}
+					</div>
+				) : (
+					<div className="text-center py-8 text-gray-500">
+						No categories yet. Add your first category below!
+					</div>
+				)}
+
 				{/* Add New Category */}
-				<div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+				<div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
 					<h3 className="text-sm font-medium mb-3 text-gray-700">
 						Add New Category
 					</h3>
@@ -354,78 +477,6 @@ function RouteComponent() {
 						</Button>
 					</div>
 				</div>
-
-				{/* Categories List */}
-				{sortedCategories.length > 0 ? (
-					<div className="space-y-2">
-						{sortedCategories.map((category) => (
-							<div
-								key={category.id}
-								className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-							>
-								<div className="relative">
-									<Button
-										type="button"
-										variant="ghost"
-										className="h-10 w-12 text-2xl p-0 hover:bg-gray-200"
-										onClick={() =>
-											setShowEmojiPicker(
-												showEmojiPicker === category.id ? null : category.id,
-											)
-										}
-									>
-										{category.emoji || "📦"}
-									</Button>
-									{showEmojiPicker === category.id && (
-										<div className="absolute z-10 mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
-											<div className="grid grid-cols-6 gap-2 w-64">
-												{COMMON_EMOJIS.map((emoji) => (
-													<button
-														key={emoji}
-														type="button"
-														onClick={() =>
-															handleUpdateEmoji(category.id, emoji)
-														}
-														className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
-													>
-														{emoji}
-													</button>
-												))}
-											</div>
-										</div>
-									)}
-								</div>
-								<div className="flex-1">
-									<div className="font-medium text-gray-900">
-										{category.name}
-									</div>
-								</div>
-								<div className="w-40">
-									<Input
-										type="number"
-										value={category.budgetedAmount}
-										onChange={(e) =>
-											handleUpdateCategory(category.id, e.target.value)
-										}
-										className="text-right"
-									/>
-								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => handleDeleteCategory(category.id)}
-									className="flex items-center gap-1 hover:text-red-500"
-								>
-									<Trash2 size={16} />
-								</Button>
-							</div>
-						))}
-					</div>
-				) : (
-					<div className="text-center py-8 text-gray-500">
-						No categories yet. Add your first category above!
-					</div>
-				)}
 			</div>
 		</div>
 	);
