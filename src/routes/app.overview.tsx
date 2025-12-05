@@ -1,31 +1,7 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-	Book,
-	Briefcase,
-	Car,
-	Cat,
-	Coffee,
-	CreditCard,
-	Dog,
-	Dumbbell,
-	Film,
-	Gift,
-	GraduationCap,
-	Heart,
-	Home,
-	Lightbulb,
-	type LucideIcon,
-	Music,
-	PiggyBank,
-	Plane,
-	Shirt,
-	ShoppingCart,
-	Sparkles,
-	Utensils,
-	Wallet,
-} from "lucide-react";
 import { LabelList, Pie, PieChart } from "recharts";
+import { CategoryIcon } from "@/components/CategoryIcon";
 import {
 	Card,
 	CardContent,
@@ -48,7 +24,7 @@ export const Route = createFileRoute("/app/overview")({
 	component: RouteComponent,
 });
 
-// Generate distinct colors for categories
+// Fallback colors for categories without a color set
 const CHART_COLORS = [
 	"#3b82f6", // blue
 	"#10b981", // emerald
@@ -63,31 +39,6 @@ const CHART_COLORS = [
 	"#a855f7", // purple
 	"#eab308", // yellow
 ];
-
-const AVAILABLE_ICONS: Record<string, LucideIcon> = {
-	Heart,
-	PiggyBank,
-	ShoppingCart,
-	Home,
-	Lightbulb,
-	Car,
-	CreditCard,
-	Utensils,
-	Coffee,
-	Plane,
-	GraduationCap,
-	Briefcase,
-	Dumbbell,
-	Music,
-	Film,
-	Book,
-	Shirt,
-	Gift,
-	Dog,
-	Cat,
-	Sparkles,
-	Wallet,
-};
 
 function RouteComponent() {
 	// Query transactions from the database
@@ -299,17 +250,14 @@ function RouteComponent() {
 									const category = budgetCategories?.find(
 										(c) => c.id === item.categoryId,
 									);
-									const IconComponent =
-										category && AVAILABLE_ICONS[category.icon || "Wallet"]
-											? AVAILABLE_ICONS[category.icon || "Wallet"]
-											: Wallet;
 									return (
 										<div key={item.categoryId}>
 											<div className="flex items-center justify-between mb-1">
 												<div className="flex items-center gap-2">
 													{category ? (
-														<IconComponent
-															style={{ color: item.fill }}
+														<CategoryIcon
+															icon={category.icon}
+															color={item.fill}
 															size={16}
 														/>
 													) : (

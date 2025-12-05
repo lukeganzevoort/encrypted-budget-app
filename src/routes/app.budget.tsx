@@ -1,47 +1,18 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-	Book,
-	Briefcase,
-	Car,
-	Cat,
-	Coffee,
-	CreditCard,
-	Dog,
-	Dumbbell,
-	Film,
-	Gift,
-	GraduationCap,
-	Heart,
-	Home,
-	Lightbulb,
-	type LucideIcon,
-	Music,
-	PiggyBank,
-	Plane,
-	Plus,
-	Shirt,
-	ShoppingCart,
-	Sparkles,
-	Trash2,
-	Utensils,
-	Wallet,
-} from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { IconColorPicker } from "@/components/IconColorPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
 import {
 	type BudgetCategory,
 	type BudgetSettings,
 	budgetCategoriesCollection,
 	budgetSettingsCollection,
 } from "@/db-collections/index";
+import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
 import { generateHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/budget")({
@@ -61,59 +32,14 @@ const DEFAULT_CATEGORIES = [
 	{ name: "Spending", amount: 350, icon: "CreditCard", color: "#14b8a6" },
 ];
 
-const AVAILABLE_ICONS: Record<string, LucideIcon> = {
-	Heart,
-	PiggyBank,
-	ShoppingCart,
-	Home,
-	Lightbulb,
-	Car,
-	CreditCard,
-	Utensils,
-	Coffee,
-	Plane,
-	GraduationCap,
-	Briefcase,
-	Dumbbell,
-	Music,
-	Film,
-	Book,
-	Shirt,
-	Gift,
-	Dog,
-	Cat,
-	Sparkles,
-	Wallet,
-};
-
-const AVAILABLE_COLORS = [
-	// Row 1: Light shades
-	{ name: "Red Light", value: "#fca5a5", group: "Red" },
-	{ name: "Orange Light", value: "#fdba74", group: "Orange" },
-	{ name: "Yellow Light", value: "#fde047", group: "Yellow" },
-	{ name: "Green Light", value: "#86efac", group: "Green" },
-	{ name: "Teal Light", value: "#5eead4", group: "Teal" },
-	{ name: "Blue Light", value: "#93c5fd", group: "Blue" },
-	{ name: "Purple Light", value: "#c4b5fd", group: "Purple" },
-	{ name: "Pink Light", value: "#f9a8d4", group: "Pink" },
-	// Row 2: Dark shades
-	{ name: "Red Dark", value: "#b91c1c", group: "Red" },
-	{ name: "Orange Dark", value: "#c2410c", group: "Orange" },
-	{ name: "Yellow Dark", value: "#a16207", group: "Yellow" },
-	{ name: "Green Dark", value: "#15803d", group: "Green" },
-	{ name: "Teal Dark", value: "#0f766e", group: "Teal" },
-	{ name: "Blue Dark", value: "#1e40af", group: "Blue" },
-	{ name: "Purple Dark", value: "#6d28d9", group: "Purple" },
-	{ name: "Pink Dark", value: "#be185d", group: "Pink" },
-];
-
 function RouteComponent() {
 	const monthlyIncomeId = useId();
 	const [monthlyIncome, setMonthlyIncome] = useState<string>("");
 	const [newCategoryName, setNewCategoryName] = useState<string>("");
 	const [newCategoryAmount, setNewCategoryAmount] = useState<string>("");
-	const [newCategoryIcon, setNewCategoryIcon] = useState<string>("Wallet");
-	const [newCategoryColor, setNewCategoryColor] = useState<string>("#3b82f6");
+	const [newCategoryIcon, setNewCategoryIcon] = useState<string>(DEFAULT_ICON);
+	const [newCategoryColor, setNewCategoryColor] =
+		useState<string>(DEFAULT_COLOR);
 	const [categories, setCategories] = useState<BudgetCategory[]>([]);
 	const [isInitialized, setIsInitialized] = useState(false);
 	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
@@ -236,8 +162,8 @@ function RouteComponent() {
 		budgetCategoriesCollection.insert(category);
 		setNewCategoryName("");
 		setNewCategoryAmount("");
-		setNewCategoryIcon("Wallet");
-		setNewCategoryColor("#3b82f6");
+		setNewCategoryIcon(DEFAULT_ICON);
+		setNewCategoryColor(DEFAULT_COLOR);
 	};
 
 	const handleDeleteCategory = (categoryId: string) => {
@@ -366,94 +292,24 @@ function RouteComponent() {
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
 						{sortedCategories.map((category) => {
-							const IconComponent =
-								AVAILABLE_ICONS[category.icon || "Wallet"] || Wallet;
-							const iconColor = category.color || "#3b82f6";
 							return (
 								<div
 									key={category.id}
 									className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
 								>
-									<Popover
+									<IconColorPicker
+										icon={category.icon || DEFAULT_ICON}
+										color={category.color || DEFAULT_COLOR}
+										onIconChange={(icon) => handleUpdateIcon(category.id, icon)}
+										onColorChange={(color) =>
+											handleUpdateColor(category.id, color)
+										}
 										open={openPopoverId === category.id}
 										onOpenChange={(open) =>
 											setOpenPopoverId(open ? category.id : null)
 										}
-									>
-										<PopoverTrigger asChild>
-											<Button
-												variant="ghost"
-												className="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
-											>
-												<IconComponent
-													style={{ color: iconColor }}
-													size={24}
-													className="size-5"
-												/>
-											</Button>
-										</PopoverTrigger>
-										<PopoverContent className="w-80" align="start">
-											<div className="mb-4">
-												<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-													Select Color
-												</h4>
-												<div className="grid grid-cols-8 gap-1">
-													{AVAILABLE_COLORS.map((color) => (
-														<button
-															key={color.value}
-															type="button"
-															onClick={() =>
-																handleUpdateColor(category.id, color.value)
-															}
-															className={`h-8 rounded transition-all ${
-																category.color === color.value
-																	? "ring-2 ring-gray-800 ring-offset-1"
-																	: "hover:scale-105"
-															}`}
-															style={{ backgroundColor: color.value }}
-															title={color.name}
-														/>
-													))}
-												</div>
-											</div>
-											<div className="border-t pt-4">
-												<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-													Select Icon
-												</h4>
-												<div className="grid grid-cols-5 gap-2">
-													{Object.entries(AVAILABLE_ICONS).map(
-														([name, Icon]) => (
-															<Button
-																key={name}
-																variant="ghost"
-																size="icon"
-																onClick={() =>
-																	handleUpdateIcon(category.id, name)
-																}
-																className={`hover:bg-gray-100 rounded p-2 transition-colors ${
-																	category.icon === name
-																		? "bg-gray-200 ring-2 ring-gray-500"
-																		: ""
-																}`}
-																title={name}
-															>
-																<Icon size={20} />
-															</Button>
-														),
-													)}
-												</div>
-											</div>
-											<div className="mt-4 pt-3 border-t flex justify-end">
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() => setOpenPopoverId(null)}
-												>
-													Done
-												</Button>
-											</div>
-										</PopoverContent>
-									</Popover>
+										triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
+									/>
 									<div className="flex-1">
 										{editingCategoryId === category.id ? (
 											<Input
@@ -517,85 +373,15 @@ function RouteComponent() {
 						Add New Category
 					</h3>
 					<div className="flex gap-3">
-						<Popover
+						<IconColorPicker
+							icon={newCategoryIcon}
+							color={newCategoryColor}
+							onIconChange={setNewCategoryIcon}
+							onColorChange={setNewCategoryColor}
 							open={openPopoverId === "new"}
 							onOpenChange={(open) => setOpenPopoverId(open ? "new" : null)}
-						>
-							<PopoverTrigger asChild>
-								<Button
-									type="button"
-									variant="outline"
-									className="h-12 w-12 p-0 rounded-full"
-								>
-									{(() => {
-										const NewIconComponent =
-											AVAILABLE_ICONS[newCategoryIcon] || Wallet;
-										return (
-											<NewIconComponent
-												style={{ color: newCategoryColor }}
-												size={20}
-												className="size-5"
-											/>
-										);
-									})()}
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent className="w-80" align="start">
-								<div className="mb-4">
-									<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-										Select Color
-									</h4>
-									<div className="grid grid-cols-8 gap-1">
-										{AVAILABLE_COLORS.map((color) => (
-											<button
-												key={color.value}
-												type="button"
-												onClick={() => setNewCategoryColor(color.value)}
-												className={`h-8 rounded transition-all ${
-													newCategoryColor === color.value
-														? "ring-2 ring-gray-800 ring-offset-1"
-														: "hover:scale-105"
-												}`}
-												style={{ backgroundColor: color.value }}
-												title={color.name}
-											/>
-										))}
-									</div>
-								</div>
-								<div className="border-t pt-4">
-									<h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-										Select Icon
-									</h4>
-									<div className="grid grid-cols-5 gap-2">
-										{Object.entries(AVAILABLE_ICONS).map(([name, Icon]) => (
-											<Button
-												key={name}
-												variant="ghost"
-												size="icon"
-												onClick={() => setNewCategoryIcon(name)}
-												className={`hover:bg-gray-100 rounded p-2 transition-colors ${
-													newCategoryIcon === name
-														? "bg-gray-200 ring-2 ring-gray-500"
-														: ""
-												}`}
-												title={name}
-											>
-												<Icon style={{ color: newCategoryColor }} size={20} />
-											</Button>
-										))}
-									</div>
-								</div>
-								<div className="mt-4 pt-3 border-t flex justify-end">
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => setOpenPopoverId(null)}
-									>
-										Done
-									</Button>
-								</div>
-							</PopoverContent>
-						</Popover>
+							triggerClassName="h-12 w-12 p-0 rounded-full"
+						/>
 						<div className="flex-1">
 							<Input
 								type="text"
