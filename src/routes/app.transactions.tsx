@@ -354,7 +354,13 @@ function RouteComponent() {
 																	</SelectContent>
 																</Select>
 															) : (
-																<span className="text-sm text-gray-500">
+																<span
+																	className={`text-sm ${
+																		isBalanced
+																			? "text-gray-500"
+																			: "text-red-600"
+																	}`}
+																>
 																	Split ({transaction.splits?.length ?? 0}{" "}
 																	categories)
 																</span>
