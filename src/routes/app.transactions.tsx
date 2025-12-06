@@ -354,16 +354,26 @@ function RouteComponent() {
 																	</SelectContent>
 																</Select>
 															) : (
-																<span
+																<button
+																	type="button"
 																	className={`text-sm ${
 																		isBalanced
 																			? "text-gray-500"
 																			: "text-red-600"
-																	}`}
+																	} hover:underline hover:opacity-80 focus:outline-none`}
+																	onClick={() => toggleSplit(transaction.id)}
+																	onKeyDown={(e) => {
+																		if (e.key === "Enter" || e.key === " ") {
+																			e.preventDefault();
+																			toggleSplit(transaction.id);
+																		}
+																	}}
+																	tabIndex={0}
+																	aria-pressed="false"
 																>
 																	Split ({transaction.splits?.length ?? 0}{" "}
 																	categories)
-																</span>
+																</button>
 															)}
 														</div>
 													</td>
