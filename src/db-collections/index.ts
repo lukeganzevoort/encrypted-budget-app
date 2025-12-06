@@ -32,6 +32,7 @@ const TransactionSchema = z.object({
 	amount: z.number(),
 	categoryId: z.string().optional(),
 	splits: z.array(TransactionSplitSchema).optional(),
+	groupId: z.string().optional(),
 });
 
 export type TransactionSplit = z.infer<typeof TransactionSplitSchema>;

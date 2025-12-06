@@ -1,11 +1,16 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Split, X } from "lucide-react";
+import { Link as LinkIcon, Plus, Search, Split, Unlink, X } from "lucide-react";
 import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -49,6 +54,8 @@ function RouteComponent() {
 	const [expandedTransactionId, setExpandedTransactionId] = useState<
 		string | null
 	>(null);
+	const [linkSearchQuery, setLinkSearchQuery] = useState<string>("");
+	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 
 	// Query transactions from the database
 	const { data: transactions } = useLiveQuery((q) =>
@@ -212,6 +219,91 @@ function RouteComponent() {
 		return splits.reduce((sum, split) => sum + split.amount, 0);
 	};
 
+	const linkTransactions = (
+		sourceTransactionId: string,
+		targetTransactionId: string,
+	) => {
+		console.log(
+			"Grouping transactions:",
+			sourceTransactionId,
+			targetTransactionId,
+		);
+
+		const sourceTransaction = transactions?.find(
+			(t) => t.id === sourceTransactionId,
+		);
+		const targetTransaction = transactions?.find(
+			(t) => t.id === targetTransactionId,
+		);
+
+		if (!sourceTransaction || !targetTransaction) return;
+
+		// Use existing group ID from source or target, or create a new one
+		const groupId =
+			sourceTransaction.groupId ||
+			targetTransaction.groupId ||
+			crypto.randomUUID();
+
+		// Add both transactions to the group
+		transactionsCollection.update(sourceTransactionId, (item) => {
+			item.groupId = groupId;
+		});
+
+		transactionsCollection.update(targetTransactionId, (item) => {
+			item.groupId = groupId;
+		});
+
+		// Close popover and reset search
+		setOpenPopoverId(null);
+		setLinkSearchQuery("");
+	};
+
+	const unlinkTransaction = (transactionId: string) => {
+		// Remove transaction from its group
+		transactionsCollection.update(transactionId, (item) => {
+			item.groupId = undefined;
+		});
+	};
+
+	const getGroupedTransactions = (groupId: string | undefined) => {
+		if (!groupId || !transactions) return [];
+		return transactions.filter(
+			(t) => t.groupId === groupId && t.id !== undefined,
+		);
+	};
+
+	const getFilteredTransactions = (currentTransactionId: string) => {
+		if (!transactions) return [];
+
+		const currentTransaction = transactions.find(
+			(tx) => tx.id === currentTransactionId,
+		);
+		const query = linkSearchQuery.toLowerCase();
+
+		return transactions.filter((t) => {
+			// Don't show the current transaction
+			if (t.id === currentTransactionId) return false;
+
+			// Don't show transactions already in the same group
+			if (
+				currentTransaction?.groupId &&
+				t.groupId === currentTransaction.groupId
+			) {
+				return false;
+			}
+
+			// Filter by search query
+			if (query) {
+				return (
+					t.description.toLowerCase().includes(query) ||
+					t.amount.toString().includes(query) ||
+					new Date(t.date).toLocaleDateString().includes(query)
+				);
+			}
+			return true;
+		});
+	};
+
 	// Sort categories by name for the dropdown
 	const sortedCategories = budgetCategories
 		? [...budgetCategories].sort((a, b) => a.name.localeCompare(b.name))
@@ -251,6 +343,7 @@ function RouteComponent() {
 									<th className="text-left p-3 border-b">Description</th>
 									<th className="text-left p-3 border-b">Category</th>
 									<th className="text-right p-3 border-b">Amount</th>
+									<th className="text-center p-3 border-b">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -267,6 +360,12 @@ function RouteComponent() {
 										const isBalanced = hasSplits
 											? Math.abs(splitsTotal - transactionTotal) < 0.01
 											: true;
+										const isGrouped = !!transaction.groupId;
+										const groupedTransactions = isGrouped
+											? getGroupedTransactions(transaction.groupId).filter(
+													(t) => t.id !== transaction.id,
+												)
+											: [];
 
 										return (
 											<>
@@ -381,10 +480,108 @@ function RouteComponent() {
 														{transaction.amount < 0 && "-"}$
 														{Math.abs(transaction.amount).toFixed(2)}
 													</td>
+													<td className="p-3 text-center">
+														<div className="flex items-center justify-center gap-2">
+															<Popover
+																open={openPopoverId === transaction.id}
+																onOpenChange={(open) => {
+																	setOpenPopoverId(
+																		open ? transaction.id : null,
+																	);
+																	if (!open) setLinkSearchQuery("");
+																}}
+															>
+																<PopoverTrigger asChild>
+																	<Button
+																		variant="ghost"
+																		size="sm"
+																		className="h-8 w-8 p-0"
+																		title="Group with another transaction"
+																	>
+																		<LinkIcon className="h-4 w-4" />
+																	</Button>
+																</PopoverTrigger>
+																<PopoverContent
+																	className="w-96 p-0"
+																	align="end"
+																>
+																	<div className="flex flex-col max-h-[400px]">
+																		<div className="p-3 border-b sticky top-0 bg-white">
+																			<h4 className="font-semibold text-sm mb-2">
+																				Group Transaction
+																			</h4>
+																			<div className="relative">
+																				<Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+																				<Input
+																					placeholder="Search transactions..."
+																					value={linkSearchQuery}
+																					onChange={(e) =>
+																						setLinkSearchQuery(e.target.value)
+																					}
+																					className="pl-8"
+																				/>
+																			</div>
+																		</div>
+																		<div className="overflow-y-auto flex-1">
+																			{getFilteredTransactions(transaction.id)
+																				.slice(0, 50)
+																				.map((t) => (
+																					<button
+																						key={t.id}
+																						type="button"
+																						onClick={() =>
+																							linkTransactions(
+																								transaction.id,
+																								t.id,
+																							)
+																						}
+																						className="w-full p-3 hover:bg-gray-50 text-left border-b last:border-b-0 transition-colors"
+																					>
+																						<div className="flex items-start justify-between gap-2">
+																							<div className="flex-1 min-w-0">
+																								<div className="text-xs text-gray-500 mb-1">
+																									{new Date(t.date).getMonth() +
+																										1}
+																									/{new Date(t.date).getDate()}/
+																									{new Date(
+																										t.date,
+																									).getUTCFullYear()}
+																								</div>
+																								<div className="text-sm text-gray-900 truncate">
+																									{t.description}
+																								</div>
+																							</div>
+																							<div className="text-sm font-medium whitespace-nowrap">
+																								{t.amount < 0 && "-"}$
+																								{Math.abs(t.amount).toFixed(2)}
+																							</div>
+																						</div>
+																					</button>
+																				))}
+																			{getFilteredTransactions(transaction.id)
+																				.length === 0 && (
+																				<div className="p-8 text-center text-sm text-gray-500">
+																					No transactions found
+																				</div>
+																			)}
+																		</div>
+																	</div>
+																</PopoverContent>
+															</Popover>
+															{isGrouped && (
+																<span
+																	className="text-xs text-blue-600 font-medium"
+																	title={`Grouped with ${groupedTransactions.length} transaction(s)`}
+																>
+																	({groupedTransactions.length + 1})
+																</span>
+															)}
+														</div>
+													</td>
 												</tr>
 												{isExpanded && hasSplits && transaction.splits && (
 													<tr key={`${transaction.id}-splits`}>
-														<td colSpan={4} className="p-4 bg-gray-50">
+														<td colSpan={5} className="p-4 bg-gray-50">
 															<div className="space-y-3">
 																<div className="flex items-center justify-between mb-2">
 																	<h4 className="font-semibold text-sm">
@@ -513,6 +710,64 @@ function RouteComponent() {
 																	<Plus className="h-4 w-4 mr-2" />
 																	Add Split
 																</Button>
+															</div>
+														</td>
+													</tr>
+												)}
+												{isGrouped && groupedTransactions.length > 0 && (
+													<tr key={`${transaction.id}-group`}>
+														<td colSpan={5} className="p-4 bg-blue-50">
+															<div className="space-y-2">
+																<h4 className="font-semibold text-sm mb-2">
+																	Grouped Transactions
+																</h4>
+																{groupedTransactions.map(
+																	(groupedTransaction) => (
+																		<div
+																			key={groupedTransaction.id}
+																			className="flex items-center gap-3 bg-white p-2 rounded"
+																		>
+																			<div className="flex-1 grid grid-cols-3 gap-2">
+																				<div className="text-xs">
+																					{new Date(
+																						groupedTransaction.date,
+																					).getMonth() + 1}
+																					/
+																					{new Date(
+																						groupedTransaction.date,
+																					).getDate()}
+																					/
+																					{new Date(
+																						groupedTransaction.date,
+																					).getUTCFullYear()}
+																				</div>
+																				<div className="text-xs text-gray-600">
+																					{groupedTransaction.description}
+																				</div>
+																				<div className="text-xs text-right">
+																					{groupedTransaction.amount < 0 && "-"}
+																					$
+																					{Math.abs(
+																						groupedTransaction.amount,
+																					).toFixed(2)}
+																				</div>
+																			</div>
+																			<Button
+																				variant="ghost"
+																				size="sm"
+																				className="h-8 w-8 p-0"
+																				onClick={() =>
+																					unlinkTransaction(
+																						groupedTransaction.id,
+																					)
+																				}
+																				title="Remove from group"
+																			>
+																				<Unlink className="h-4 w-4" />
+																			</Button>
+																		</div>
+																	),
+																)}
 															</div>
 														</td>
 													</tr>
