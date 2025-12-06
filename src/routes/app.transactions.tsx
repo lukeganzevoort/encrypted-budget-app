@@ -1,9 +1,11 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { Plus, Split, X } from "lucide-react";
 import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -14,6 +16,7 @@ import {
 import {
 	budgetCategoriesCollection,
 	type Transaction,
+	type TransactionSplit,
 	transactionsCollection,
 } from "@/db-collections/index";
 import { generateTransactionHash } from "@/lib/utils";
@@ -43,6 +46,9 @@ function RouteComponent() {
 	const [fileName, setFileName] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [expandedTransactionId, setExpandedTransactionId] = useState<
+		string | null
+	>(null);
 
 	// Query transactions from the database
 	const { data: transactions } = useLiveQuery((q) =>
@@ -133,7 +139,77 @@ function RouteComponent() {
 	const handleCategoryChange = (transactionId: string, categoryId: string) => {
 		transactionsCollection.update(transactionId, (item) => {
 			item.categoryId = categoryId === "uncategorized" ? undefined : categoryId;
+			// Clear splits when changing the main category
+			item.splits = undefined;
 		});
+	};
+
+	const toggleSplit = (transactionId: string) => {
+		const transaction = transactions?.find((t) => t.id === transactionId);
+		if (!transaction) return;
+
+		if (expandedTransactionId === transactionId) {
+			// Closing split view
+			setExpandedTransactionId(null);
+		} else {
+			// Opening split view
+			setExpandedTransactionId(transactionId);
+
+			// Initialize splits if not already set
+			if (!transaction.splits || transaction.splits.length === 0) {
+				const halfAmount = Math.abs(transaction.amount) / 2;
+				transactionsCollection.update(transactionId, (item) => {
+					item.splits = [
+						{ categoryId: item.categoryId, amount: halfAmount },
+						{ categoryId: undefined, amount: halfAmount },
+					];
+					// Clear main categoryId when using splits
+					item.categoryId = undefined;
+				});
+			}
+		}
+	};
+
+	const updateSplitCategory = (
+		transactionId: string,
+		splitIndex: number,
+		categoryId: string,
+	) => {
+		transactionsCollection.update(transactionId, (item) => {
+			if (!item.splits) return;
+			item.splits[splitIndex].categoryId =
+				categoryId === "uncategorized" ? undefined : categoryId;
+		});
+	};
+
+	const updateSplitAmount = (
+		transactionId: string,
+		splitIndex: number,
+		amount: number,
+	) => {
+		transactionsCollection.update(transactionId, (item) => {
+			if (!item.splits) return;
+			item.splits[splitIndex].amount = amount;
+		});
+	};
+
+	const addSplit = (transactionId: string) => {
+		transactionsCollection.update(transactionId, (item) => {
+			if (!item.splits) return;
+			item.splits.push({ categoryId: undefined, amount: 0 });
+		});
+	};
+
+	const removeSplit = (transactionId: string, splitIndex: number) => {
+		transactionsCollection.update(transactionId, (item) => {
+			if (!item.splits || item.splits.length <= 2) return;
+			item.splits.splice(splitIndex, 1);
+		});
+	};
+
+	const getSplitTotal = (splits?: TransactionSplit[]): number => {
+		if (!splits) return 0;
+		return splits.reduce((sum, split) => sum + split.amount, 0);
 	};
 
 	// Sort categories by name for the dropdown
@@ -142,7 +218,7 @@ function RouteComponent() {
 		: [];
 
 	return (
-		<div className="flex flex-col items-center p-10 h-screen">
+		<div className="flex flex-col items-center p-0 sm:p-6 md:p-10 h-screen">
 			<input
 				type="file"
 				ref={fileInputRef}
@@ -180,83 +256,254 @@ function RouteComponent() {
 							<tbody>
 								{transactions
 									.sort((a, b) => a.date - b.date)
-									.map((transaction) => (
-										<tr
-											key={transaction.id}
-											className="border-b hover:bg-gray-50"
-										>
-											<td className="p-3 whitespace-nowrap">
-												{new Date(transaction.date).getMonth() + 1}/
-												{new Date(transaction.date).getDate()}
-												{new Date(transaction.date).getUTCFullYear() ===
-												new Date().getUTCFullYear()
-													? ""
-													: `/${new Date(transaction.date).getUTCFullYear()}`}
-											</td>
-											<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
-												{transaction.description.replaceAll("<br />", "\n")}
-											</td>
-											<td className="p-3">
-												<Select
-													value={transaction.categoryId || "uncategorized"}
-													onValueChange={(value) =>
-														handleCategoryChange(transaction.id, value)
-													}
+									.map((transaction) => {
+										const isExpanded = expandedTransactionId === transaction.id;
+										const hasSplits =
+											transaction.splits && transaction.splits.length > 0;
+										const splitsTotal = hasSplits
+											? getSplitTotal(transaction.splits)
+											: 0;
+										const transactionTotal = Math.abs(transaction.amount);
+										const isBalanced = hasSplits
+											? Math.abs(splitsTotal - transactionTotal) < 0.01
+											: true;
+
+										return (
+											<>
+												<tr
+													key={transaction.id}
+													className="border-b hover:bg-gray-50"
 												>
-													<SelectTrigger className="w-[200px]">
-														<SelectValue placeholder="Select category">
-															{(() => {
-																if (
-																	!transaction.categoryId ||
-																	transaction.categoryId === "uncategorized"
-																) {
-																	return "Uncategorized";
-																}
-																const cat = sortedCategories.find(
-																	(c) => c.id === transaction.categoryId,
-																);
-																if (!cat) return "Uncategorized";
-																return (
-																	<div className="flex items-center gap-2">
-																		<CategoryIcon
-																			icon={cat.icon}
-																			color={cat.color}
-																			size={16}
-																		/>
-																		<span>{cat.name}</span>
+													<td className="p-3 whitespace-nowrap">
+														{new Date(transaction.date).getMonth() + 1}/
+														{new Date(transaction.date).getDate()}
+														{new Date(transaction.date).getUTCFullYear() ===
+														new Date().getUTCFullYear()
+															? ""
+															: `/${new Date(transaction.date).getUTCFullYear()}`}
+													</td>
+													<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
+														{transaction.description.replaceAll("<br />", "\n")}
+													</td>
+													<td className="p-3">
+														<div className="flex items-center gap-2">
+															<Button
+																variant="ghost"
+																size="sm"
+																className="h-6 w-6 p-0"
+																onClick={() => toggleSplit(transaction.id)}
+															>
+																<Split className="h-4 w-4 rotate-90" />
+															</Button>
+															{!hasSplits ? (
+																<Select
+																	value={
+																		transaction.categoryId || "uncategorized"
+																	}
+																	onValueChange={(value) =>
+																		handleCategoryChange(transaction.id, value)
+																	}
+																>
+																	<SelectTrigger className="w-[200px]">
+																		<SelectValue placeholder="Select category">
+																			{(() => {
+																				if (
+																					!transaction.categoryId ||
+																					transaction.categoryId ===
+																						"uncategorized"
+																				) {
+																					return "Uncategorized";
+																				}
+																				const cat = sortedCategories.find(
+																					(c) =>
+																						c.id === transaction.categoryId,
+																				);
+																				if (!cat) return "Uncategorized";
+																				return (
+																					<div className="flex items-center gap-2">
+																						<CategoryIcon
+																							icon={cat.icon}
+																							color={cat.color}
+																							size={16}
+																						/>
+																						<span>{cat.name}</span>
+																					</div>
+																				);
+																			})()}
+																		</SelectValue>
+																	</SelectTrigger>
+																	<SelectContent>
+																		<SelectItem
+																			value="uncategorized"
+																			className="text-gray-500"
+																		>
+																			Uncategorized
+																		</SelectItem>
+																		{sortedCategories.map((cat) => (
+																			<SelectItem key={cat.id} value={cat.id}>
+																				<div className="flex items-center gap-2">
+																					<CategoryIcon
+																						icon={cat.icon}
+																						color={cat.color}
+																						size={16}
+																					/>
+																					<span>{cat.name}</span>
+																				</div>
+																			</SelectItem>
+																		))}
+																	</SelectContent>
+																</Select>
+															) : (
+																<span className="text-sm text-gray-500">
+																	Split ({transaction.splits?.length ?? 0}{" "}
+																	categories)
+																</span>
+															)}
+														</div>
+													</td>
+													<td className="p-3 text-right whitespace-nowrap">
+														{transaction.amount < 0 && "-"}$
+														{Math.abs(transaction.amount).toFixed(2)}
+													</td>
+												</tr>
+												{isExpanded && hasSplits && transaction.splits && (
+													<tr key={`${transaction.id}-splits`}>
+														<td colSpan={5} className="p-4 bg-gray-50">
+															<div className="space-y-3">
+																<div className="flex items-center justify-between mb-2">
+																	<h4 className="font-semibold text-sm">
+																		Split Transaction
+																	</h4>
+																	<div
+																		className={`text-sm ${
+																			isBalanced
+																				? "text-green-600"
+																				: "text-red-600"
+																		}`}
+																	>
+																		Total: ${splitsTotal.toFixed(2)} / $
+																		{transactionTotal.toFixed(2)}
 																	</div>
-																);
-															})()}
-														</SelectValue>
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem
-															value="uncategorized"
-															className="text-gray-500"
-														>
-															Uncategorized
-														</SelectItem>
-														{sortedCategories.map((cat) => (
-															<SelectItem key={cat.id} value={cat.id}>
-																<div className="flex items-center gap-2">
-																	<CategoryIcon
-																		icon={cat.icon}
-																		color={cat.color}
-																		size={16}
-																	/>
-																	<span>{cat.name}</span>
 																</div>
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-											</td>
-											<td className="p-3 text-right whitespace-nowrap">
-												{transaction.amount < 0 && "-"}$
-												{Math.abs(transaction.amount).toFixed(2)}
-											</td>
-										</tr>
-									))}
+																{transaction.splits.map((split, index) => (
+																	<div
+																		key={`split-${transaction.id}-${index}`}
+																		className="flex items-center gap-3"
+																	>
+																		<div className="flex-1">
+																			<Select
+																				value={
+																					split.categoryId || "uncategorized"
+																				}
+																				onValueChange={(value) =>
+																					updateSplitCategory(
+																						transaction.id,
+																						index,
+																						value,
+																					)
+																				}
+																			>
+																				<SelectTrigger className="w-full">
+																					<SelectValue placeholder="Select category">
+																						{(() => {
+																							if (
+																								!split.categoryId ||
+																								split.categoryId ===
+																									"uncategorized"
+																							) {
+																								return "Uncategorized";
+																							}
+																							const cat = sortedCategories.find(
+																								(c) =>
+																									c.id === split.categoryId,
+																							);
+																							if (!cat) return "Uncategorized";
+																							return (
+																								<div className="flex items-center gap-2">
+																									<CategoryIcon
+																										icon={cat.icon}
+																										color={cat.color}
+																										size={16}
+																									/>
+																									<span>{cat.name}</span>
+																								</div>
+																							);
+																						})()}
+																					</SelectValue>
+																				</SelectTrigger>
+																				<SelectContent>
+																					<SelectItem
+																						value="uncategorized"
+																						className="text-gray-500"
+																					>
+																						Uncategorized
+																					</SelectItem>
+																					{sortedCategories.map((cat) => (
+																						<SelectItem
+																							key={cat.id}
+																							value={cat.id}
+																						>
+																							<div className="flex items-center gap-2">
+																								<CategoryIcon
+																									icon={cat.icon}
+																									color={cat.color}
+																									size={16}
+																								/>
+																								<span>{cat.name}</span>
+																							</div>
+																						</SelectItem>
+																					))}
+																				</SelectContent>
+																			</Select>
+																		</div>
+																		<div className="w-32">
+																			<Input
+																				type="number"
+																				step="0.01"
+																				min="0"
+																				value={split.amount}
+																				onChange={(e) =>
+																					updateSplitAmount(
+																						transaction.id,
+																						index,
+																						Number.parseFloat(e.target.value) ||
+																							0,
+																					)
+																				}
+																				className="text-right"
+																			/>
+																		</div>
+																		{transaction.splits &&
+																			transaction.splits.length > 2 && (
+																				<Button
+																					variant="ghost"
+																					size="sm"
+																					className="h-8 w-8 p-0"
+																					onClick={() =>
+																						removeSplit(transaction.id, index)
+																					}
+																				>
+																					<X className="h-4 w-4" />
+																				</Button>
+																			)}
+																	</div>
+																))}
+																<Button
+																	variant="outline"
+																	size="sm"
+																	onClick={() => addSplit(transaction.id)}
+																	className="w-full"
+																>
+																	<Plus className="h-4 w-4 mr-2" />
+																	Add Split
+																</Button>
+															</div>
+														</td>
+													</tr>
+												)}
+											</>
+										);
+									})}
 							</tbody>
 						</table>
 					</div>

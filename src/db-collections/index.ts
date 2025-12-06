@@ -20,14 +20,21 @@ export const messagesCollection = createCollection(
 	}),
 );
 
+const TransactionSplitSchema = z.object({
+	categoryId: z.string().optional(),
+	amount: z.number(),
+});
+
 const TransactionSchema = z.object({
 	id: z.string(),
 	date: z.number(),
 	description: z.string(),
 	amount: z.number(),
 	categoryId: z.string().optional(),
+	splits: z.array(TransactionSplitSchema).optional(),
 });
 
+export type TransactionSplit = z.infer<typeof TransactionSplitSchema>;
 export type Transaction = z.infer<typeof TransactionSchema>;
 
 export const transactionsCollection = createCollection(

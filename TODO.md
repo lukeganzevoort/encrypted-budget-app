@@ -33,7 +33,7 @@ February, 2026
 ## Core Features:
 
 - [x] Add icons and colors to budgets
-- [ ] Allow split transactions between multiple budgets
+- [x] Allow split transactions between multiple budgets
 - [ ] Allow linked transactions between multiple transactions
 - [ ] Allow for account specification when uploading transactions
 - [ ] Allow for multiple csv's to be uploaded at once
@@ -45,6 +45,7 @@ February, 2026
 - [ ] Make budget amounts roll over to the next month
 - [ ] Allow for manual transaction entry
 - [ ] Add recurring transactions feature (monthly bills, subscriptions)
+- [ ] Mobile optimization
 
 ## Database & Infrastructure:
 

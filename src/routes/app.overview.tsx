@@ -65,10 +65,23 @@ function RouteComponent() {
 		// Only include expenses (negative amounts)
 		if (transaction.amount < 0) {
 			const amount = Math.abs(transaction.amount);
-			if (transaction.categoryId) {
+
+			// Handle split transactions
+			if (transaction.splits && transaction.splits.length > 0) {
+				transaction.splits.forEach((split) => {
+					if (split.categoryId) {
+						const current = categorySpending.get(split.categoryId) || 0;
+						categorySpending.set(split.categoryId, current + split.amount);
+					} else {
+						uncategorizedTotal += split.amount;
+					}
+				});
+			} else if (transaction.categoryId) {
+				// Handle regular single-category transactions
 				const current = categorySpending.get(transaction.categoryId) || 0;
 				categorySpending.set(transaction.categoryId, current + amount);
 			} else {
+				// Uncategorized transaction
 				uncategorizedTotal += amount;
 			}
 		}
