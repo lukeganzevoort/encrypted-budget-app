@@ -374,7 +374,7 @@ function RouteComponent() {
 												</tr>
 												{isExpanded && hasSplits && transaction.splits && (
 													<tr key={`${transaction.id}-splits`}>
-														<td colSpan={5} className="p-4 bg-gray-50">
+														<td colSpan={4} className="p-4 bg-gray-50">
 															<div className="space-y-3">
 																<div className="flex items-center justify-between mb-2">
 																	<h4 className="font-semibold text-sm">
@@ -467,7 +467,7 @@ function RouteComponent() {
 																				type="number"
 																				step="0.01"
 																				min="0"
-																				value={split.amount}
+																				value={split.amount.toString()}
 																				onChange={(e) =>
 																					updateSplitAmount(
 																						transaction.id,
