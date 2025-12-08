@@ -35,7 +35,7 @@ February, 2026
 - [x] Add icons and colors to budgets
 - [x] Allow split transactions between multiple budgets
 - [ ] Allow linked transactions between multiple transactions
-- [ ] Allow for account specification when uploading transactions
+- [x] Allow for account specification when uploading transactions
 - [ ] Allow for multiple csv's to be uploaded at once
 - [ ] Finalize UI pages (login, overview, budget, transactions)
 - [ ] Add colors on the budget page
@@ -46,6 +46,8 @@ February, 2026
 - [ ] Allow for manual transaction entry
 - [ ] Add recurring transactions feature (monthly bills, subscriptions)
 - [ ] Mobile optimization
+- [ ] Add income default budget category
+- [x] Add cash default account
 
 ## Database & Infrastructure:
 

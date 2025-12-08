@@ -2,9 +2,17 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Split, X } from "lucide-react";
 import Papa from "papaparse";
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -14,6 +22,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import {
+	accountsCollection,
 	budgetCategoriesCollection,
 	type Transaction,
 	type TransactionSplit,
@@ -26,6 +35,12 @@ export const Route = createFileRoute("/app/transactions")({
 });
 
 type CsvRow = Record<string, string | undefined>;
+
+type ParsedTransaction = {
+	rawDate: string;
+	rawDescription: string;
+	rawAmount: string;
+};
 
 const parseAmount = (amount: string | undefined): number => {
 	if (!amount) return 0;
@@ -45,6 +60,11 @@ const parseDate = (rawDate: string): number => {
 function RouteComponent() {
 	const [fileName, setFileName] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(false);
+	const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [parsedTransactions, setParsedTransactions] = useState<
+		ParsedTransaction[]
+	>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [expandedTransactionId, setExpandedTransactionId] = useState<
 		string | null
@@ -66,6 +86,23 @@ function RouteComponent() {
 		})),
 	);
 
+	// Query accounts from the database
+	const { data: accounts } = useLiveQuery((q) =>
+		q.from({ account: accountsCollection }).select(({ account }) => ({
+			...account,
+		})),
+	);
+
+	// Set default account (Cash) when accounts load and dialog opens
+	useEffect(() => {
+		if (accounts && accounts.length > 0 && isDialogOpen && !selectedAccountId) {
+			const cashAccount = accounts.find((a) => a.isDefault) || accounts[0];
+			if (cashAccount) {
+				setSelectedAccountId(cashAccount.id);
+			}
+		}
+	}, [accounts, isDialogOpen, selectedAccountId]);
+
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		if (!file) return;
@@ -86,50 +123,88 @@ function RouteComponent() {
 				}
 				return header;
 			},
-			complete: async (results) => {
+			complete: (results) => {
 				console.log("Parsed CSV data:", results.data);
 
-				// Insert parsed data into transactions collection
+				// Filter out rows with missing required fields
+				const validRows: ParsedTransaction[] = [];
 				for (const row of results.data) {
 					const { rawDate, rawDescription, rawAmount } = row;
-
-					if (!rawDate || !rawDescription || !rawAmount) {
-						throw new Error("Missing required fields");
-					}
-
-					// Generate a unique hash ID based on transaction data
-					const uniqueId = await generateTransactionHash(
-						rawDate,
-						rawDescription,
-						rawAmount,
-					);
-
-					const amount = parseAmount(rawAmount);
-					const date = parseDate(rawDate);
-
-					const transaction: Transaction = {
-						id: uniqueId,
-						date,
-						description: rawDescription,
-						amount,
-					};
-					try {
-						console.log("Inserting new transaction:", transaction);
-						transactionsCollection.insert(transaction);
-					} catch (error) {
-						console.error("Error inserting transaction:", error);
+					if (rawDate && rawDescription && rawAmount) {
+						validRows.push({
+							rawDate,
+							rawDescription,
+							rawAmount,
+						});
 					}
 				}
 
+				setParsedTransactions(validRows);
 				setIsLoading(false);
+				setIsDialogOpen(true);
 			},
 			header: true, // Use first row as headers
 			skipEmptyLines: true,
 			error: (error) => {
 				console.error("Error parsing CSV:", error);
+				alert("Error parsing CSV file. Please check the file format.");
 				setIsLoading(false);
 			},
 		});
+
+		// Reset file input so the same file can be selected again
+		if (fileInputRef.current) {
+			fileInputRef.current.value = "";
+		}
+	};
+
+	const handleConfirmImport = async () => {
+		if (!selectedAccountId) {
+			alert("Please select an account");
+			return;
+		}
+
+		setIsLoading(true);
+
+		// Insert parsed data into transactions collection
+		for (const row of parsedTransactions) {
+			const { rawDate, rawDescription, rawAmount } = row;
+
+			// Generate a unique hash ID based on transaction data
+			const uniqueId = await generateTransactionHash(
+				rawDate,
+				rawDescription,
+				rawAmount,
+			);
+
+			const amount = parseAmount(rawAmount);
+			const date = parseDate(rawDate);
+
+			const transaction: Transaction = {
+				id: uniqueId,
+				date,
+				description: rawDescription,
+				amount,
+				accountId: selectedAccountId,
+			};
+			try {
+				console.log("Inserting new transaction:", transaction);
+				transactionsCollection.insert(transaction);
+			} catch (error) {
+				console.error("Error inserting transaction:", error);
+			}
+		}
+
+		setIsLoading(false);
+		setIsDialogOpen(false);
+		setParsedTransactions([]);
+		setSelectedAccountId("");
+	};
+
+	const handleCancelImport = () => {
+		setIsDialogOpen(false);
+		setParsedTransactions([]);
+		setSelectedAccountId("");
 	};
 
 	const handleButtonClick = () => {
@@ -217,22 +292,90 @@ function RouteComponent() {
 		? [...budgetCategories].sort((a, b) => a.name.localeCompare(b.name))
 		: [];
 
+	// Sort accounts by name for the dropdown
+	const sortedAccounts = accounts
+		? [...accounts].sort((a, b) => a.name.localeCompare(b.name))
+		: [];
+
+	const accountSelectId = useId();
+
 	return (
 		<div className="flex flex-col items-center p-0 sm:p-6 md:p-10 h-screen">
-			<input
-				type="file"
-				ref={fileInputRef}
-				onChange={handleFileUpload}
-				accept=".csv"
-				className="hidden"
-			/>
-			<Button
-				className="ml-auto"
-				onClick={handleButtonClick}
-				disabled={isLoading}
+			<div className="w-full max-w-6xl mb-4 flex justify-end">
+				<input
+					type="file"
+					ref={fileInputRef}
+					onChange={handleFileUpload}
+					accept=".csv"
+					className="hidden"
+				/>
+				<Button onClick={handleButtonClick} disabled={isLoading}>
+					{isLoading ? "Parsing..." : "Upload CSV File"}
+				</Button>
+			</div>
+
+			{/* Account Selection Dialog */}
+			<Dialog
+				open={isDialogOpen}
+				onOpenChange={(open) => {
+					if (!open) {
+						handleCancelImport();
+					}
+				}}
 			>
-				{isLoading ? "Parsing..." : "Upload CSV File"}
-			</Button>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Select Account for Import</DialogTitle>
+						<DialogDescription>
+							{parsedTransactions.length > 0
+								? `Select the account for ${parsedTransactions.length} transaction${parsedTransactions.length !== 1 ? "s" : ""} from ${fileName}`
+								: "Select the account for the imported transactions"}
+						</DialogDescription>
+					</DialogHeader>
+					<div className="py-4">
+						<label
+							htmlFor={accountSelectId}
+							className="block text-sm font-medium mb-2"
+						>
+							Account
+						</label>
+						<Select
+							value={selectedAccountId}
+							onValueChange={setSelectedAccountId}
+						>
+							<SelectTrigger id={accountSelectId} className="w-full">
+								<SelectValue placeholder="Select an account">
+									{selectedAccountId &&
+										sortedAccounts.find((a) => a.id === selectedAccountId)
+											?.name}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								{sortedAccounts.map((account) => (
+									<SelectItem key={account.id} value={account.id}>
+										{account.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={handleCancelImport}
+							disabled={isLoading}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleConfirmImport}
+							disabled={isLoading || !selectedAccountId}
+						>
+							{isLoading ? "Importing..." : "Import Transactions"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			{fileName && (
 				<div className="mt-4 text-sm text-gray-600">Uploaded: {fileName}</div>
@@ -249,6 +392,7 @@ function RouteComponent() {
 								<tr>
 									<th className="text-left p-3 border-b">Date</th>
 									<th className="text-left p-3 border-b">Description</th>
+									<th className="text-left p-3 border-b">Account</th>
 									<th className="text-left p-3 border-b">Category</th>
 									<th className="text-right p-3 border-b">Amount</th>
 								</tr>
@@ -284,6 +428,14 @@ function RouteComponent() {
 													</td>
 													<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
 														{transaction.description.replaceAll("<br />", "\n")}
+													</td>
+													<td className="p-3 text-sm">
+														{(() => {
+															const account = sortedAccounts.find(
+																(a) => a.id === transaction.accountId,
+															);
+															return account ? account.name : "Unknown";
+														})()}
 													</td>
 													<td className="p-3">
 														<div className="flex items-center gap-2">
@@ -384,7 +536,7 @@ function RouteComponent() {
 												</tr>
 												{isExpanded && hasSplits && transaction.splits && (
 													<tr key={`${transaction.id}-splits`}>
-														<td colSpan={4} className="p-4 bg-gray-50">
+														<td colSpan={5} className="p-4 bg-gray-50">
 															<div className="space-y-3">
 																<div className="flex items-center justify-between mb-2">
 																	<h4 className="font-semibold text-sm">

@@ -30,6 +30,7 @@ const TransactionSchema = z.object({
 	date: z.number(),
 	description: z.string(),
 	amount: z.number(),
+	accountId: z.string(),
 	categoryId: z.string().optional(),
 	splits: z.array(TransactionSplitSchema).optional(),
 });
@@ -101,6 +102,7 @@ const AccountSchema = z.object({
 	color: z.string().optional(),
 	order: z.number(),
 	isActive: z.boolean().default(true),
+	isDefault: z.boolean().default(false),
 });
 
 export type Account = z.infer<typeof AccountSchema>;
