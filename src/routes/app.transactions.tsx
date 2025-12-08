@@ -2,7 +2,7 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Split, X } from "lucide-react";
 import Papa from "papaparse";
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Button } from "@/components/ui/button";
 import {
@@ -413,11 +413,8 @@ function RouteComponent() {
 											: true;
 
 										return (
-											<>
-												<tr
-													key={transaction.id}
-													className="border-b hover:bg-gray-50"
-												>
+											<Fragment key={transaction.id}>
+												<tr className="border-b hover:bg-gray-50">
 													<td className="p-3 whitespace-nowrap">
 														{new Date(transaction.date).getMonth() + 1}/
 														{new Date(transaction.date).getDate()}
@@ -669,7 +666,7 @@ function RouteComponent() {
 														</td>
 													</tr>
 												)}
-											</>
+											</Fragment>
 										);
 									})}
 							</tbody>
