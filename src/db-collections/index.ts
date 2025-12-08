@@ -81,3 +81,35 @@ export const budgetCategoriesCollection = createCollection(
 		schema: BudgetCategorySchema,
 	}),
 );
+
+const AccountSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	type: z.enum([
+		"checking",
+		"savings",
+		"investment",
+		"other",
+		"credit",
+		"loan",
+		"mortgage",
+	]),
+	balance: z.number(),
+	creditLimit: z.number().optional(),
+	interestRate: z.number().optional(),
+	icon: z.string().optional(),
+	color: z.string().optional(),
+	order: z.number(),
+	isActive: z.boolean().default(true),
+});
+
+export type Account = z.infer<typeof AccountSchema>;
+
+export const accountsCollection = createCollection(
+	localStorageCollectionOptions({
+		id: "accounts",
+		storageKey: "accounts",
+		getKey: (account) => account.id,
+		schema: AccountSchema,
+	}),
+);

@@ -17,6 +17,7 @@ import { Route as DemoDbChatRouteImport } from './routes/demo/db-chat'
 import { Route as AppTransactionsRouteImport } from './routes/app.transactions'
 import { Route as AppOverviewRouteImport } from './routes/app.overview'
 import { Route as AppBudgetRouteImport } from './routes/app.budget'
+import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoFormSimpleRouteImport } from './routes/demo/form.simple'
@@ -66,6 +67,11 @@ const AppOverviewRoute = AppOverviewRouteImport.update({
 const AppBudgetRoute = AppBudgetRouteImport.update({
   id: '/app/budget',
   path: '/app/budget',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppAccountsRoute = AppAccountsRouteImport.update({
+  id: '/app/accounts',
+  path: '/app/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
@@ -121,6 +127,7 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
   '/app/transactions': typeof AppTransactionsRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
   '/app/transactions': typeof AppTransactionsRoute
@@ -162,6 +170,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
   '/app/transactions': typeof AppTransactionsRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
     | '/app/transactions'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
     | '/app/transactions'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
     | '/app/transactions'
@@ -245,6 +257,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppAccountsRoute: typeof AppAccountsRoute
   AppBudgetRoute: typeof AppBudgetRoute
   AppOverviewRoute: typeof AppOverviewRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
@@ -322,6 +335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBudgetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/accounts': {
+      id: '/app/accounts'
+      path: '/app/accounts'
+      fullPath: '/app/accounts'
+      preLoaderRoute: typeof AppAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/demo/start/server-funcs': {
       id: '/demo/start/server-funcs'
       path: '/demo/start/server-funcs'
@@ -397,6 +417,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppAccountsRoute: AppAccountsRoute,
   AppBudgetRoute: AppBudgetRoute,
   AppOverviewRoute: AppOverviewRoute,
   AppTransactionsRoute: AppTransactionsRoute,

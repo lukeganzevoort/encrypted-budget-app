@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
+	Building2,
 	ChevronDown,
 	ChevronRight,
 	ClipboardType,
@@ -61,6 +62,16 @@ export default function Header() {
 						}}
 					>
 						Budget
+					</Link>
+					<Link
+						to="/app/accounts"
+						className="px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+						activeProps={{
+							className:
+								"px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors text-sm",
+						}}
+					>
+						Accounts
 					</Link>
 					<Link
 						to="/app/transactions"
@@ -137,6 +148,19 @@ export default function Header() {
 					>
 						<Wallet size={20} />
 						<span className="font-medium">Budget</span>
+					</Link>
+
+					<Link
+						to="/app/accounts"
+						onClick={() => setIsOpen(false)}
+						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+						activeProps={{
+							className:
+								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
+						}}
+					>
+						<Building2 size={20} />
+						<span className="font-medium">Accounts</span>
 					</Link>
 
 					<Link
