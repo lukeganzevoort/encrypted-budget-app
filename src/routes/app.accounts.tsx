@@ -75,7 +75,6 @@ function RouteComponent() {
 	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 	const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 	const [editingAccountName, setEditingAccountName] = useState<string>("");
-	const [isInitialized, setIsInitialized] = useState(false);
 
 	// Generate all IDs at the top level to avoid conditional hook calls
 	const accountNameId = useId();
@@ -84,46 +83,12 @@ function RouteComponent() {
 	const creditLimitId = useId();
 	const interestRateId = useId();
 
-	const CASH_ACCOUNT_ID = "cash-account-default";
-
 	// Query accounts from the database
 	const { data: accountsData } = useLiveQuery((q) =>
 		q.from({ account: accountsCollection }).select(({ account }) => ({
 			...account,
 		})),
 	);
-
-	// Initialize default Cash account if none exists
-	useEffect(() => {
-		const initializeCashAccount = async () => {
-			if (isInitialized) return;
-
-			// Check if Cash account exists
-			const hasCashAccount =
-				accountsData?.some((account) => account.id === CASH_ACCOUNT_ID) ??
-				false;
-
-			if (!hasCashAccount) {
-				const cashAccount: Account = {
-					id: CASH_ACCOUNT_ID,
-					name: "Cash",
-					type: "checking",
-					balance: 0,
-					order: -1, // Put it first
-					icon: "Wallet",
-					color: "#10b981",
-					isActive: true,
-					isDefault: true,
-				};
-				accountsCollection.insert(cashAccount);
-				setIsInitialized(true);
-			} else {
-				setIsInitialized(true);
-			}
-		};
-
-		initializeCashAccount();
-	}, [accountsData, isInitialized]);
 
 	// Update local accounts state when database changes
 	useEffect(() => {

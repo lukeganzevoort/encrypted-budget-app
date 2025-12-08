@@ -15,6 +15,7 @@ import { Route as DemoTableRouteImport } from './routes/demo/table'
 import { Route as DemoDbChatApiRouteImport } from './routes/demo/db-chat-api'
 import { Route as DemoDbChatRouteImport } from './routes/demo/db-chat'
 import { Route as AppTransactionsRouteImport } from './routes/app.transactions'
+import { Route as AppRefreshRouteImport } from './routes/app.refresh'
 import { Route as AppOverviewRouteImport } from './routes/app.overview'
 import { Route as AppBudgetRouteImport } from './routes/app.budget'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
@@ -57,6 +58,11 @@ const DemoDbChatRoute = DemoDbChatRouteImport.update({
 const AppTransactionsRoute = AppTransactionsRouteImport.update({
   id: '/app/transactions',
   path: '/app/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRefreshRoute = AppRefreshRouteImport.update({
+  id: '/app/refresh',
+  path: '/app/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppOverviewRoute = AppOverviewRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
+  '/app/refresh': typeof AppRefreshRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
+  '/app/refresh': typeof AppRefreshRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/app/accounts': typeof AppAccountsRoute
   '/app/budget': typeof AppBudgetRoute
   '/app/overview': typeof AppOverviewRoute
+  '/app/refresh': typeof AppRefreshRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
+    | '/app/refresh'
     | '/app/transactions'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
+    | '/app/refresh'
     | '/app/transactions'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/budget'
     | '/app/overview'
+    | '/app/refresh'
     | '/app/transactions'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppBudgetRoute: typeof AppBudgetRoute
   AppOverviewRoute: typeof AppOverviewRoute
+  AppRefreshRoute: typeof AppRefreshRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   DemoDbChatRoute: typeof DemoDbChatRoute
   DemoDbChatApiRoute: typeof DemoDbChatApiRoute
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/app/transactions'
       fullPath: '/app/transactions'
       preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app/refresh': {
+      id: '/app/refresh'
+      path: '/app/refresh'
+      fullPath: '/app/refresh'
+      preLoaderRoute: typeof AppRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/overview': {
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppBudgetRoute: AppBudgetRoute,
   AppOverviewRoute: AppOverviewRoute,
+  AppRefreshRoute: AppRefreshRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   DemoDbChatRoute: DemoDbChatRoute,
   DemoDbChatApiRoute: DemoDbChatApiRoute,

@@ -21,17 +21,6 @@ export const Route = createFileRoute("/app/budget")({
 
 const BUDGET_SETTINGS_ID = "default-budget-settings";
 
-const DEFAULT_INCOME = 5000;
-const DEFAULT_CATEGORIES = [
-	{ name: "Giving", amount: 500, icon: "Heart", color: "#ec4899" },
-	{ name: "Saving", amount: 750, icon: "PiggyBank", color: "#10b981" },
-	{ name: "Groceries", amount: 500, icon: "ShoppingCart", color: "#f97316" },
-	{ name: "Home", amount: 1500, icon: "Home", color: "#3b82f6" },
-	{ name: "Bills", amount: 1000, icon: "Lightbulb", color: "#eab308" },
-	{ name: "Transportation", amount: 400, icon: "Car", color: "#a855f7" },
-	{ name: "Spending", amount: 350, icon: "CreditCard", color: "#14b8a6" },
-];
-
 function RouteComponent() {
 	const monthlyIncomeId = useId();
 	const [monthlyIncome, setMonthlyIncome] = useState<string>("");
@@ -41,7 +30,6 @@ function RouteComponent() {
 	const [newCategoryColor, setNewCategoryColor] =
 		useState<string>(DEFAULT_COLOR);
 	const [categories, setCategories] = useState<BudgetCategory[]>([]);
-	const [isInitialized, setIsInitialized] = useState(false);
 	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 	const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
 		null,
@@ -61,49 +49,6 @@ function RouteComponent() {
 			...category,
 		})),
 	);
-
-	// Initialize default data if none exists
-	useEffect(() => {
-		const initializeDefaults = async () => {
-			if (isInitialized) return;
-
-			// Check if we need to initialize
-			const hasSettings = budgetSettingsData && budgetSettingsData.length > 0;
-			const hasCategories = budgetCategories && budgetCategories.length > 0;
-
-			if (!hasSettings && !hasCategories) {
-				// Initialize default income
-				const settings: BudgetSettings = {
-					id: BUDGET_SETTINGS_ID,
-					monthlyIncome: DEFAULT_INCOME,
-				};
-				budgetSettingsCollection.insert(settings);
-
-				// Initialize default categories
-				for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
-					const defaultCat = DEFAULT_CATEGORIES[i];
-					const id = await generateHash(
-						`${defaultCat.name}-${Date.now()}-${i}`,
-					);
-					const category: BudgetCategory = {
-						id,
-						name: defaultCat.name,
-						budgetedAmount: defaultCat.amount,
-						order: i,
-						icon: defaultCat.icon,
-						color: defaultCat.color,
-					};
-					budgetCategoriesCollection.insert(category);
-				}
-
-				setIsInitialized(true);
-			} else {
-				setIsInitialized(true);
-			}
-		};
-
-		initializeDefaults();
-	}, [budgetSettingsData, budgetCategories, isInitialized]);
 
 	// Initialize income from database
 	useEffect(() => {
