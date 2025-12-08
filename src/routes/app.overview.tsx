@@ -16,9 +16,11 @@ import {
 	ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
+	type BudgetCategory,
 	budgetCategoriesCollection,
 	transactionsCollection,
 } from "@/db-collections/index";
+import { INCOME_CATEGORY_ID } from "@/lib/initialization";
 
 export const Route = createFileRoute("/app/overview")({
 	component: RouteComponent,
@@ -57,8 +59,20 @@ function RouteComponent() {
 		})),
 	);
 
+	const uncategorizedCategory: BudgetCategory = {
+		id: "uncategorized",
+		order: 0,
+		name: "Uncategorized",
+		icon: "CircleQuestionMark",
+		color: "#9ca3af",
+		budgetedAmount: 0,
+	};
+
 	// Calculate spending by category
-	const categorySpending = new Map<string, number>();
+	const categorySpending = new Map<string, number>(
+		(budgetCategories ?? []).map((cat) => [cat.id, 0]),
+	);
+
 	let uncategorizedTotal = 0;
 
 	transactions?.forEach((transaction) => {
@@ -139,15 +153,22 @@ function RouteComponent() {
 	});
 
 	// Calculate total spending
-	const totalSpending = chartData.reduce((sum, item) => sum + item.amount, 0);
+	const totalSpending =
+		transactions
+			?.filter((t) => t.categoryId !== INCOME_CATEGORY_ID)
+			.reduce((sum, t) => sum - t.amount, 0) || 0;
 
 	// Calculate statistics
 	const totalTransactions = transactions?.length || 0;
-	const expenseCount = transactions?.filter((t) => t.amount < 0).length || 0;
-	const incomeCount = transactions?.filter((t) => t.amount > 0).length || 0;
+	const expenseCount =
+		transactions?.filter((t) => t.categoryId !== INCOME_CATEGORY_ID).length ||
+		0;
+	const incomeCount =
+		transactions?.filter((t) => t.categoryId === INCOME_CATEGORY_ID).length ||
+		0;
 	const totalIncome =
 		transactions
-			?.filter((t) => t.amount > 0)
+			?.filter((t) => t.categoryId === INCOME_CATEGORY_ID)
 			.reduce((sum, t) => sum + t.amount, 0) || 0;
 
 	return (
@@ -217,110 +238,182 @@ function RouteComponent() {
 				</Card>
 			</div>
 
-			{/* Pie Chart */}
-			{chartData.length > 0 ? (
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<Card className="flex flex-col">
-						<CardHeader className="items-center pb-0">
-							<CardTitle>Spending by Category</CardTitle>
-							<CardDescription>
-								Total expenses: ${totalSpending.toFixed(2)}
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex-1 pb-0">
-							<ChartContainer
-								config={chartConfig}
-								className="mx-auto aspect-square max-h-[400px]"
-							>
-								<PieChart>
-									<ChartTooltip
-										cursor={false}
-										content={<ChartTooltipContent hideLabel />}
-									/>
-									<Pie data={chartData} dataKey="amount" nameKey="category">
-										<LabelList
-											dataKey="category"
-											className="fill-background"
-											stroke="none"
-											fontSize={12}
-										/>
-									</Pie>
-								</PieChart>
-							</ChartContainer>
-						</CardContent>
-					</Card>
+			{/* Pie Chart and Category Breakdown */}
+			{(() => {
+				// Build breakdown data for all categories (excluding income)
+				const breakdownData: Array<{
+					categoryId: string;
+					category: BudgetCategory;
+					amount: number;
+					fill: string;
+				}> = [];
 
-					{/* Category Breakdown */}
-					<Card>
-						<CardHeader>
-							<CardTitle>Category Breakdown</CardTitle>
-							<CardDescription>Spending by category</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-4">
-								{chartData.map((item) => {
-									const percentage = (item.amount / totalSpending) * 100;
-									const category = budgetCategories?.find(
-										(c) => c.id === item.categoryId,
-									);
-									return (
-										<div key={item.categoryId}>
-											<div className="flex items-center justify-between mb-1">
-												<div className="flex items-center gap-2">
-													{category ? (
-														<CategoryIcon
-															icon={category.icon}
-															color={item.fill}
-															size={16}
-														/>
-													) : (
-														<div
-															className="w-3 h-3 rounded-full"
-															style={{ backgroundColor: item.fill }}
-														/>
-													)}
-													<span className="font-medium">{item.category}</span>
+				// Add all expense categories
+				budgetCategories
+					?.filter((cat) => cat.id !== INCOME_CATEGORY_ID)
+					.forEach((category) => {
+						const spending = categorySpending.get(category.id) || 0;
+						const fill =
+							category.color ||
+							CHART_COLORS[breakdownData.length % CHART_COLORS.length];
+						breakdownData.push({
+							categoryId: category.id,
+							category,
+							amount: spending,
+							fill,
+						});
+					});
+
+				// Add uncategorized if there are any
+				if (uncategorizedTotal > 0) {
+					breakdownData.push({
+						categoryId: "uncategorized",
+						category: uncategorizedCategory,
+						amount: uncategorizedTotal,
+						fill: "#9ca3af",
+					});
+				}
+
+				// Sort by amount descending, then by name
+				breakdownData.sort((a, b) => {
+					if (b.amount !== a.amount) {
+						return b.amount - a.amount;
+					}
+					return a.category.name.localeCompare(b.category.name);
+				});
+
+				const hasExpenseCategories =
+					budgetCategories?.some((cat) => cat.id !== INCOME_CATEGORY_ID) ??
+					false;
+
+				if (!hasExpenseCategories) {
+					return (
+						<Card>
+							<CardContent className="flex items-center justify-center py-16">
+								<div className="text-center">
+									<p className="text-lg text-muted-foreground mb-2">
+										No expense categories available
+									</p>
+									<p className="text-sm text-muted-foreground">
+										Create budget categories to see your spending breakdown
+									</p>
+								</div>
+							</CardContent>
+						</Card>
+					);
+				}
+
+				return (
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+						{chartData.length > 0 ? (
+							<Card className="flex flex-col">
+								<CardHeader className="items-center pb-0">
+									<CardTitle>Spending by Category</CardTitle>
+									<CardDescription>
+										Total expenses: ${totalSpending.toFixed(2)}
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="flex-1 pb-0">
+									<ChartContainer
+										config={chartConfig}
+										className="mx-auto aspect-square max-h-[400px]"
+									>
+										<PieChart>
+											<ChartTooltip
+												cursor={false}
+												content={<ChartTooltipContent hideLabel />}
+											/>
+											<Pie data={chartData} dataKey="amount" nameKey="category">
+												<LabelList
+													dataKey="category"
+													className="fill-background"
+													stroke="none"
+													fontSize={12}
+												/>
+											</Pie>
+										</PieChart>
+									</ChartContainer>
+								</CardContent>
+							</Card>
+						) : (
+							<Card>
+								<CardContent className="flex items-center justify-center py-16">
+									<div className="text-center">
+										<p className="text-lg text-muted-foreground mb-2">
+											No expense data available
+										</p>
+										<p className="text-sm text-muted-foreground">
+											Upload transactions and categorize them to see your
+											spending chart
+										</p>
+									</div>
+								</CardContent>
+							</Card>
+						)}
+
+						{/* Category Breakdown */}
+						<Card>
+							<CardHeader>
+								<CardTitle>Category Breakdown</CardTitle>
+								<CardDescription>Spending by category</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<div className="space-y-4">
+									{breakdownData.length > 0 ? (
+										breakdownData.map((item) => {
+											const percentage =
+												item.category.budgetedAmount > 0
+													? (item.amount / item.category.budgetedAmount) * 100
+													: item.amount > 0
+														? 100
+														: 0;
+											return (
+												<div key={item.categoryId}>
+													<div className="flex items-center justify-between mb-1">
+														<div className="flex items-center gap-2">
+															<CategoryIcon
+																icon={item.category.icon}
+																color={item.fill}
+																size={16}
+															/>
+															<span className="font-medium">
+																{item.category.name}
+															</span>
+														</div>
+														<span className="text-sm font-medium">
+															${item.amount.toFixed(2)}
+														</span>
+													</div>
+													<div className="flex items-center gap-2">
+														<div className="flex-1 bg-gray-200 rounded-full h-2">
+															<div
+																className="h-2 rounded-full"
+																style={{
+																	width: `${Math.min(percentage, 100)}%`,
+																	backgroundColor: item.fill,
+																}}
+															/>
+														</div>
+														<span className="text-xs text-muted-foreground w-12 text-right">
+															{item.category.budgetedAmount > 0
+																? `${percentage.toFixed(1)}%`
+																: "—"}
+														</span>
+													</div>
 												</div>
-												<span className="text-sm font-medium">
-													${item.amount.toFixed(2)}
-												</span>
-											</div>
-											<div className="flex items-center gap-2">
-												<div className="flex-1 bg-gray-200 rounded-full h-2">
-													<div
-														className="h-2 rounded-full"
-														style={{
-															width: `${percentage}%`,
-															backgroundColor: item.fill,
-														}}
-													/>
-												</div>
-												<span className="text-xs text-muted-foreground w-12 text-right">
-													{percentage.toFixed(1)}%
-												</span>
-											</div>
-										</div>
-									);
-								})}
-							</div>
-						</CardContent>
-					</Card>
-				</div>
-			) : (
-				<Card>
-					<CardContent className="flex items-center justify-center py-16">
-						<div className="text-center">
-							<p className="text-lg text-muted-foreground mb-2">
-								No expense data available
-							</p>
-							<p className="text-sm text-muted-foreground">
-								Upload transactions and categorize them to see your spending
-								breakdown
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-			)}
+											);
+										})
+									) : (
+										<p className="text-sm text-muted-foreground text-center py-4">
+											No categories to display
+										</p>
+									)}
+								</div>
+							</CardContent>
+						</Card>
+					</div>
+				);
+			})()}
 		</div>
 	);
 }

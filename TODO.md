@@ -46,7 +46,7 @@ February, 2026
 - [ ] Allow for manual transaction entry
 - [ ] Add recurring transactions feature (monthly bills, subscriptions)
 - [ ] Mobile optimization
-- [ ] Add income default budget category
+- [x] Add income default budget category
 - [x] Add cash default account
 
 ## Database & Infrastructure:
