@@ -8,18 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
 	type BudgetCategory,
-	type BudgetSettings,
 	budgetCategoriesCollection,
-	budgetSettingsCollection,
 } from "@/db-collections/index";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
+import { INCOME_CATEGORY_ID } from "@/lib/initialization";
 import { generateHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/budget")({
 	component: RouteComponent,
 });
-
-const BUDGET_SETTINGS_ID = "default-budget-settings";
 
 function RouteComponent() {
 	const monthlyIncomeId = useId();
@@ -36,13 +33,6 @@ function RouteComponent() {
 	);
 	const [editingCategoryName, setEditingCategoryName] = useState<string>("");
 
-	// Query budget settings from the database
-	const { data: budgetSettingsData } = useLiveQuery((q) =>
-		q.from({ settings: budgetSettingsCollection }).select(({ settings }) => ({
-			...settings,
-		})),
-	);
-
 	// Query budget categories from the database
 	const { data: budgetCategories } = useLiveQuery((q) =>
 		q.from({ category: budgetCategoriesCollection }).select(({ category }) => ({
@@ -50,12 +40,15 @@ function RouteComponent() {
 		})),
 	);
 
-	// Initialize income from database
+	// Initialize income from Income category
 	useEffect(() => {
-		if (budgetSettingsData && budgetSettingsData.length > 0) {
-			setMonthlyIncome(budgetSettingsData[0].monthlyIncome.toString());
+		const incomeCategory = budgetCategories?.find(
+			(category) => category.id === INCOME_CATEGORY_ID,
+		);
+		if (incomeCategory) {
+			setMonthlyIncome(incomeCategory.budgetedAmount.toString());
 		}
-	}, [budgetSettingsData]);
+	}, [budgetCategories]);
 
 	// Update local categories state when database changes
 	useEffect(() => {
@@ -64,19 +57,34 @@ function RouteComponent() {
 		}
 	}, [budgetCategories]);
 
-	const handleSaveIncome = () => {
+	const handleSaveIncome = async () => {
 		const income = Number.parseFloat(monthlyIncome);
 		if (Number.isNaN(income) || income < 0) {
 			alert("Please enter a valid income amount");
 			return;
 		}
 
-		const settings: BudgetSettings = {
-			id: BUDGET_SETTINGS_ID,
-			monthlyIncome: income,
-		};
+		const incomeCategory = budgetCategories?.find(
+			(category) => category.id === INCOME_CATEGORY_ID,
+		);
 
-		budgetSettingsCollection.insert(settings);
+		if (incomeCategory) {
+			// Update existing Income category
+			budgetCategoriesCollection.update(INCOME_CATEGORY_ID, (item) => {
+				item.budgetedAmount = income;
+			});
+		} else {
+			// Create Income category if it doesn't exist
+			const newIncomeCategory: BudgetCategory = {
+				id: INCOME_CATEGORY_ID,
+				name: "Income",
+				budgetedAmount: income,
+				order: 0,
+				icon: "DollarSign",
+				color: "#10b981",
+			};
+			budgetCategoriesCollection.insert(newIncomeCategory);
+		}
 	};
 
 	const handleAddCategory = async () => {
@@ -162,11 +170,14 @@ function RouteComponent() {
 	};
 
 	// Calculate totals
-	const currentIncome = budgetSettingsData?.[0]?.monthlyIncome || 0;
-	const totalBudgeted = categories.reduce(
-		(sum, cat) => sum + cat.budgetedAmount,
-		0,
+	const incomeCategory = categories.find(
+		(cat) => cat.id === INCOME_CATEGORY_ID,
 	);
+	const currentIncome = incomeCategory?.budgetedAmount || 0;
+	// Exclude Income category from total budgeted (only count expenses)
+	const totalBudgeted = categories
+		.filter((cat) => cat.id !== INCOME_CATEGORY_ID)
+		.reduce((sum, cat) => sum + cat.budgetedAmount, 0);
 	const remainingBalance = currentIncome - totalBudgeted;
 
 	// Sort categories by order
@@ -237,7 +248,7 @@ function RouteComponent() {
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
 						{sortedCategories
-							.filter((category) => category.name !== "Income")
+							.filter((category) => category.id !== INCOME_CATEGORY_ID)
 							.map((category) => {
 								return (
 									<div

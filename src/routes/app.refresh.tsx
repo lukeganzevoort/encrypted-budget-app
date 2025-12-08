@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
 	accountsCollection,
 	budgetCategoriesCollection,
-	budgetSettingsCollection,
 } from "@/db-collections/index";
-import { initializeDefaults } from "@/lib/initialization";
+import { INCOME_CATEGORY_ID, initializeDefaults } from "@/lib/initialization";
 
 export const Route = createFileRoute("/app/refresh")({
 	component: RouteComponent,
@@ -18,7 +17,6 @@ function RouteComponent() {
 	const [result, setResult] = useState<{
 		cashAccountCreated: boolean;
 		categoriesCreated: boolean;
-		settingsCreated: boolean;
 		incomeCategoryCreated: boolean;
 	} | null>(null);
 
@@ -26,13 +24,6 @@ function RouteComponent() {
 	const { data: accounts } = useLiveQuery((q) =>
 		q.from({ account: accountsCollection }).select(({ account }) => ({
 			...account,
-		})),
-	);
-
-	// Query budget settings from the database
-	const { data: budgetSettings } = useLiveQuery((q) =>
-		q.from({ settings: budgetSettingsCollection }).select(({ settings }) => ({
-			...settings,
 		})),
 	);
 
@@ -48,11 +39,7 @@ function RouteComponent() {
 		setResult(null);
 
 		try {
-			const initResult = await initializeDefaults(
-				accounts,
-				budgetSettings,
-				budgetCategories,
-			);
+			const initResult = await initializeDefaults(accounts, budgetCategories);
 			setResult(initResult);
 		} catch (error) {
 			console.error("Initialization error:", error);
@@ -73,7 +60,7 @@ function RouteComponent() {
 				<ul className="list-disc list-inside mb-4 space-y-2 text-gray-700">
 					<li>Default Cash account (if it doesn't exist)</li>
 					<li>Default budget categories (if none exist)</li>
-					<li>Default budget settings (if none exist)</li>
+					<li>Default Income category (if it doesn't exist)</li>
 				</ul>
 
 				<Button
@@ -110,16 +97,6 @@ function RouteComponent() {
 							</span>
 						</div>
 						<div className="flex items-center gap-2">
-							<span className="font-medium">Budget Settings:</span>
-							<span
-								className={
-									result.settingsCreated ? "text-green-600" : "text-gray-500"
-								}
-							>
-								{result.settingsCreated ? "Created" : "Already exist"}
-							</span>
-						</div>
-						<div className="flex items-center gap-2">
 							<span className="font-medium">Income Category:</span>
 							<span
 								className={
@@ -140,8 +117,12 @@ function RouteComponent() {
 				<div className="space-y-1 text-sm text-gray-700">
 					<div>Accounts: {accounts?.length ?? 0}</div>
 					<div>Budget Categories: {budgetCategories?.length ?? 0}</div>
-					<div>Budget Settings: {budgetSettings?.length ?? 0}</div>
-					<div>Income Category: {budgetCategories?.length ?? 0}</div>
+					<div>
+						Income Category:{" "}
+						{budgetCategories?.some((cat) => cat.id === INCOME_CATEGORY_ID)
+							? "Exists"
+							: "Missing"}
+					</div>
 				</div>
 			</div>
 		</div>

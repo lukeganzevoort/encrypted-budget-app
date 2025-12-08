@@ -2,14 +2,12 @@ import {
 	type Account,
 	accountsCollection,
 	type BudgetCategory,
-	type BudgetSettings,
 	budgetCategoriesCollection,
-	budgetSettingsCollection,
 } from "@/db-collections/index";
 import { generateHash } from "@/lib/utils";
 
 export const CASH_ACCOUNT_ID = "cash-account-default";
-export const BUDGET_SETTINGS_ID = "default-budget-settings";
+export const INCOME_CATEGORY_ID = "income-category-default";
 
 export const DEFAULT_INCOME = 5000;
 export const DEFAULT_CATEGORIES = [
@@ -54,38 +52,23 @@ export async function initializeCashAccount(
 }
 
 /**
- * Initializes default budget categories and settings if they don't exist
- * @param budgetSettings - Current budget settings from the database
+ * Initializes default budget categories if they don't exist
  * @param budgetCategories - Current budget categories from the database
  * @returns Object indicating what was created
  */
 export async function initializeBudgetDefaults(
-	budgetSettings: BudgetSettings[] | undefined,
 	budgetCategories: BudgetCategory[] | undefined,
 ): Promise<{
 	categoriesCreated: boolean;
-	settingsCreated: boolean;
 	incomeCategoryCreated: boolean;
 }> {
-	const hasSettings = budgetSettings && budgetSettings.length > 0;
 	const hasCategories = budgetCategories && budgetCategories.length > 0;
-	const hasIncomeCategory = budgetCategories?.some(
-		(category) => category.name === "Income",
-	);
+	const hasIncomeCategory =
+		budgetCategories?.some((category) => category.id === INCOME_CATEGORY_ID) ??
+		false;
 
 	let categoriesCreated = false;
-	let settingsCreated = false;
 	let incomeCategoryCreated = false;
-
-	// Initialize default income if no settings exist
-	if (!hasSettings) {
-		const settings: BudgetSettings = {
-			id: BUDGET_SETTINGS_ID,
-			monthlyIncome: DEFAULT_INCOME,
-		};
-		budgetSettingsCollection.insert(settings);
-		settingsCreated = true;
-	}
 
 	// Initialize default categories if none exist
 	if (!hasCategories) {
@@ -107,7 +90,7 @@ export async function initializeBudgetDefaults(
 
 	if (!hasIncomeCategory) {
 		const incomeCategory: BudgetCategory = {
-			id: await generateHash(`Income-${Date.now()}`),
+			id: INCOME_CATEGORY_ID,
 			name: "Income",
 			budgetedAmount: DEFAULT_INCOME,
 			order: 0,
@@ -118,35 +101,31 @@ export async function initializeBudgetDefaults(
 		incomeCategoryCreated = true;
 	}
 
-	return { categoriesCreated, settingsCreated, incomeCategoryCreated };
+	return { categoriesCreated, incomeCategoryCreated };
 }
 
 /**
  * Initializes all default data (cash account and budget categories)
  * @param accounts - Current list of accounts from the database
- * @param budgetSettings - Current budget settings from the database
  * @param budgetCategories - Current budget categories from the database
  * @returns Object indicating what was created
  */
 export async function initializeDefaults(
 	accounts: Account[] | undefined,
-	budgetSettings: BudgetSettings[] | undefined,
 	budgetCategories: BudgetCategory[] | undefined,
 ): Promise<{
 	cashAccountCreated: boolean;
 	categoriesCreated: boolean;
-	settingsCreated: boolean;
 	incomeCategoryCreated: boolean;
 }> {
 	const [cashAccountCreated, budgetResult] = await Promise.all([
 		initializeCashAccount(accounts),
-		initializeBudgetDefaults(budgetSettings, budgetCategories),
+		initializeBudgetDefaults(budgetCategories),
 	]);
 
 	return {
 		cashAccountCreated,
 		categoriesCreated: budgetResult.categoriesCreated,
-		settingsCreated: budgetResult.settingsCreated,
 		incomeCategoryCreated: budgetResult.incomeCategoryCreated,
 	};
 }

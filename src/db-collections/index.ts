@@ -47,22 +47,6 @@ export const transactionsCollection = createCollection(
 	}),
 );
 
-const BudgetSettingsSchema = z.object({
-	id: z.string(),
-	monthlyIncome: z.number(),
-});
-
-export type BudgetSettings = z.infer<typeof BudgetSettingsSchema>;
-
-export const budgetSettingsCollection = createCollection(
-	localStorageCollectionOptions({
-		id: "budget-settings",
-		storageKey: "budget-settings",
-		getKey: (settings) => settings.id,
-		schema: BudgetSettingsSchema,
-	}),
-);
-
 const BudgetCategorySchema = z.object({
 	id: z.string(),
 	name: z.string(),
