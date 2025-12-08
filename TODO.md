@@ -38,8 +38,8 @@ February, 2026
 - [x] Allow for account specification when uploading transactions
 - [ ] Allow for multiple csv's to be uploaded at once
 - [ ] Finalize UI pages (login, overview, budget, transactions)
-- [ ] Add colors on the budget page
-- [ ] Fix pie chart labels
+- [x] Add colors on the budget page
+- [x] Fix pie chart labels
 - [ ] Allow creating rules for transactions to be automatically categorized
 - [ ] Allow specifying a vendor for transactions
 - [ ] Make budget amounts roll over to the next month

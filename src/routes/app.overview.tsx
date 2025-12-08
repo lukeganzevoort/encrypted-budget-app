@@ -16,6 +16,11 @@ import {
 	ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
 	transactionsCollection,
@@ -368,39 +373,46 @@ function RouteComponent() {
 														? 100
 														: 0;
 											return (
-												<div key={item.categoryId}>
-													<div className="flex items-center justify-between mb-1">
-														<div className="flex items-center gap-2">
-															<CategoryIcon
-																icon={item.category.icon}
-																color={item.fill}
-																size={16}
-															/>
-															<span className="font-medium">
-																{item.category.name}
-															</span>
+												<Tooltip key={item.categoryId}>
+													<TooltipTrigger asChild>
+														<div key={item.categoryId}>
+															<div className="flex items-center justify-between mb-1">
+																<div className="flex items-center gap-2">
+																	<CategoryIcon
+																		icon={item.category.icon}
+																		color={item.fill}
+																		size={16}
+																	/>
+																	<span className="font-medium">
+																		{item.category.name}
+																	</span>
+																</div>
+																<span className="text-sm font-medium">
+																	${item.amount.toFixed(2)}
+																</span>
+															</div>
+															<div className="flex items-center gap-2">
+																<div className="flex-1 bg-gray-200 rounded-full h-2">
+																	<div
+																		className="h-2 rounded-full"
+																		style={{
+																			width: `${Math.min(percentage, 100)}%`,
+																			backgroundColor: item.fill,
+																		}}
+																	/>
+																</div>
+																<span className="text-xs text-muted-foreground w-12 text-right">
+																	{item.category.budgetedAmount > 0
+																		? `${percentage.toFixed(1)}%`
+																		: "—"}
+																</span>
+															</div>
 														</div>
-														<span className="text-sm font-medium">
-															${item.amount.toFixed(2)}
-														</span>
-													</div>
-													<div className="flex items-center gap-2">
-														<div className="flex-1 bg-gray-200 rounded-full h-2">
-															<div
-																className="h-2 rounded-full"
-																style={{
-																	width: `${Math.min(percentage, 100)}%`,
-																	backgroundColor: item.fill,
-																}}
-															/>
-														</div>
-														<span className="text-xs text-muted-foreground w-12 text-right">
-															{item.category.budgetedAmount > 0
-																? `${percentage.toFixed(1)}%`
-																: "—"}
-														</span>
-													</div>
-												</div>
+													</TooltipTrigger>
+													<TooltipContent side="top" align="end">
+														Budgeted: ${item.category.budgetedAmount.toFixed(2)}
+													</TooltipContent>
+												</Tooltip>
 											);
 										})
 									) : (
