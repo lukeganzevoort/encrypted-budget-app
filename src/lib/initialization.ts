@@ -65,12 +65,17 @@ export async function initializeBudgetDefaults(
 ): Promise<{
 	categoriesCreated: boolean;
 	settingsCreated: boolean;
+	incomeCategoryCreated: boolean;
 }> {
 	const hasSettings = budgetSettings && budgetSettings.length > 0;
 	const hasCategories = budgetCategories && budgetCategories.length > 0;
+	const hasIncomeCategory = budgetCategories?.some(
+		(category) => category.name === "Income",
+	);
 
 	let categoriesCreated = false;
 	let settingsCreated = false;
+	let incomeCategoryCreated = false;
 
 	// Initialize default income if no settings exist
 	if (!hasSettings) {
@@ -100,7 +105,20 @@ export async function initializeBudgetDefaults(
 		categoriesCreated = true;
 	}
 
-	return { categoriesCreated, settingsCreated };
+	if (!hasIncomeCategory) {
+		const incomeCategory: BudgetCategory = {
+			id: await generateHash(`Income-${Date.now()}`),
+			name: "Income",
+			budgetedAmount: DEFAULT_INCOME,
+			order: 0,
+			icon: "DollarSign",
+			color: "#10b981",
+		};
+		budgetCategoriesCollection.insert(incomeCategory);
+		incomeCategoryCreated = true;
+	}
+
+	return { categoriesCreated, settingsCreated, incomeCategoryCreated };
 }
 
 /**
@@ -118,6 +136,7 @@ export async function initializeDefaults(
 	cashAccountCreated: boolean;
 	categoriesCreated: boolean;
 	settingsCreated: boolean;
+	incomeCategoryCreated: boolean;
 }> {
 	const [cashAccountCreated, budgetResult] = await Promise.all([
 		initializeCashAccount(accounts),
@@ -128,5 +147,6 @@ export async function initializeDefaults(
 		cashAccountCreated,
 		categoriesCreated: budgetResult.categoriesCreated,
 		settingsCreated: budgetResult.settingsCreated,
+		incomeCategoryCreated: budgetResult.incomeCategoryCreated,
 	};
 }

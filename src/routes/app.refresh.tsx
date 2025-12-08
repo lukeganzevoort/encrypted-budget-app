@@ -19,6 +19,7 @@ function RouteComponent() {
 		cashAccountCreated: boolean;
 		categoriesCreated: boolean;
 		settingsCreated: boolean;
+		incomeCategoryCreated: boolean;
 	} | null>(null);
 
 	// Query accounts from the database
@@ -118,6 +119,18 @@ function RouteComponent() {
 								{result.settingsCreated ? "Created" : "Already exist"}
 							</span>
 						</div>
+						<div className="flex items-center gap-2">
+							<span className="font-medium">Income Category:</span>
+							<span
+								className={
+									result.incomeCategoryCreated
+										? "text-green-600"
+										: "text-gray-500"
+								}
+							>
+								{result.incomeCategoryCreated ? "Created" : "Already exist"}
+							</span>
+						</div>
 					</div>
 				</div>
 			)}
@@ -128,6 +141,7 @@ function RouteComponent() {
 					<div>Accounts: {accounts?.length ?? 0}</div>
 					<div>Budget Categories: {budgetCategories?.length ?? 0}</div>
 					<div>Budget Settings: {budgetSettings?.length ?? 0}</div>
+					<div>Income Category: {budgetCategories?.length ?? 0}</div>
 				</div>
 			</div>
 		</div>
