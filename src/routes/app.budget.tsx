@@ -236,75 +236,81 @@ function RouteComponent() {
 				{/* Categories List */}
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
-						{sortedCategories.map((category) => {
-							return (
-								<div
-									key={category.id}
-									className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-								>
-									<IconColorPicker
-										icon={category.icon || DEFAULT_ICON}
-										color={category.color || DEFAULT_COLOR}
-										onIconChange={(icon) => handleUpdateIcon(category.id, icon)}
-										onColorChange={(color) =>
-											handleUpdateColor(category.id, color)
-										}
-										open={openPopoverId === category.id}
-										onOpenChange={(open) =>
-											setOpenPopoverId(open ? category.id : null)
-										}
-										triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
-									/>
-									<div className="flex-1">
-										{editingCategoryId === category.id ? (
-											<Input
-												type="text"
-												value={editingCategoryName}
-												onChange={(e) => setEditingCategoryName(e.target.value)}
-												onBlur={() => handleSaveCategoryName(category.id)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														handleSaveCategoryName(category.id);
-													} else if (e.key === "Escape") {
-														handleCancelEditingName();
-													}
-												}}
-												autoFocus
-												className="font-medium"
-											/>
-										) : (
-											<button
-												type="button"
-												className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
-												onClick={() =>
-													handleStartEditingName(category.id, category.name)
-												}
-											>
-												{category.name}
-											</button>
-										)}
-									</div>
-									<div className="w-40">
-										<Input
-											type="number"
-											value={category.budgetedAmount}
-											onChange={(e) =>
-												handleUpdateCategory(category.id, e.target.value)
-											}
-											className="text-right"
-										/>
-									</div>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => handleDeleteCategory(category.id)}
-										className="flex items-center gap-1 hover:text-red-500"
+						{sortedCategories
+							.filter((category) => category.name !== "Income")
+							.map((category) => {
+								return (
+									<div
+										key={category.id}
+										className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
 									>
-										<Trash2 size={16} />
-									</Button>
-								</div>
-							);
-						})}
+										<IconColorPicker
+											icon={category.icon || DEFAULT_ICON}
+											color={category.color || DEFAULT_COLOR}
+											onIconChange={(icon) =>
+												handleUpdateIcon(category.id, icon)
+											}
+											onColorChange={(color) =>
+												handleUpdateColor(category.id, color)
+											}
+											open={openPopoverId === category.id}
+											onOpenChange={(open) =>
+												setOpenPopoverId(open ? category.id : null)
+											}
+											triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
+										/>
+										<div className="flex-1">
+											{editingCategoryId === category.id ? (
+												<Input
+													type="text"
+													value={editingCategoryName}
+													onChange={(e) =>
+														setEditingCategoryName(e.target.value)
+													}
+													onBlur={() => handleSaveCategoryName(category.id)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") {
+															handleSaveCategoryName(category.id);
+														} else if (e.key === "Escape") {
+															handleCancelEditingName();
+														}
+													}}
+													autoFocus
+													className="font-medium"
+												/>
+											) : (
+												<button
+													type="button"
+													className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
+													onClick={() =>
+														handleStartEditingName(category.id, category.name)
+													}
+												>
+													{category.name}
+												</button>
+											)}
+										</div>
+										<div className="w-40">
+											<Input
+												type="number"
+												value={category.budgetedAmount}
+												onChange={(e) =>
+													handleUpdateCategory(category.id, e.target.value)
+												}
+												className="text-right"
+											/>
+										</div>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => handleDeleteCategory(category.id)}
+											className="flex items-center gap-1 hover:text-red-500"
+										>
+											<Trash2 size={16} />
+										</Button>
+									</div>
+								);
+							})}
 					</div>
 				) : (
 					<div className="text-center py-8 text-gray-500">
