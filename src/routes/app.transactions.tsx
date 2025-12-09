@@ -336,13 +336,7 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-col items-center p-0 sm:p-6 md:p-10 h-screen">
-			<div className="w-full max-w-6xl mb-4 flex items-center justify-between">
-				<MonthYearSelector
-					selectedYear={selectedYear}
-					selectedMonth={selectedMonth}
-					onYearChange={setSelectedYear}
-					onMonthChange={setSelectedMonth}
-				/>
+			<div className="w-full max-w-6xl mb-4 flex items-center justify-end">
 				<input
 					type="file"
 					ref={fileInputRef}
@@ -424,9 +418,17 @@ function RouteComponent() {
 
 			{transactions && (
 				<div className="mt-6 w-full max-w-6xl">
-					<h2 className="text-xl font-semibold mb-4">
-						Transactions ({transactions.length} total)
-					</h2>
+					<div className="flex items-center justify-between mb-4">
+						<h2 className="text-xl font-semibold">
+							Transactions ({transactions.length} total)
+						</h2>
+						<MonthYearSelector
+							selectedYear={selectedYear}
+							selectedMonth={selectedMonth}
+							onYearChange={setSelectedYear}
+							onMonthChange={setSelectedMonth}
+						/>
+					</div>
 					<div className="overflow-auto border rounded-lg">
 						<table className="w-full">
 							<thead className="bg-gray-100 sticky top-0">
