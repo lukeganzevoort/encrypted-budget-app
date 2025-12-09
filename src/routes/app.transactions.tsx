@@ -1,9 +1,10 @@
-import { useLiveQuery } from "@tanstack/react-db";
+import { gte, lt, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, Split, X } from "lucide-react";
 import Papa from "papaparse";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { MonthYearSelector } from "@/components/MonthYearSelector";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -49,12 +50,13 @@ const parseAmount = (amount: string | undefined): number => {
 	);
 };
 
-const parseDate = (rawDate: string): number => {
-	// Parse as UTC to avoid local timezone interpretation
-	const isoString = new Date(rawDate).toISOString();
-	console.log("isoString", isoString);
-	// Return Unix time (milliseconds since epoch)
-	return new Date(isoString.split("T")[0]).getTime();
+const parseDate = (rawDate: string): string => {
+	// Parse the date and return in YYYY-MM-DD format
+	const date = new Date(rawDate);
+	const year = date.getUTCFullYear();
+	const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+	const day = String(date.getUTCDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
 };
 
 function RouteComponent() {
@@ -70,13 +72,46 @@ function RouteComponent() {
 		string | null
 	>(null);
 
-	// Query transactions from the database
-	const { data: transactions } = useLiveQuery((q) =>
-		q
-			.from({ transaction: transactionsCollection })
-			.select(({ transaction }) => ({
-				...transaction,
-			})),
+	// Get current year and month
+	const now = new Date();
+	const currentYear = now.getFullYear();
+	const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+	// State for selected year and month, defaulting to current
+	const [selectedYear, setSelectedYear] = useState<string>(
+		currentYear.toString(),
+	);
+	const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+
+	// Combine year and month for query
+	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
+
+	// Calculate start and end dates for the selected month
+	const getMonthRange = (monthKey: string) => {
+		const [year, month] = monthKey.split("-").map(Number);
+		const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+
+		// Calculate next month
+		const nextMonth = month === 12 ? 1 : month + 1;
+		const nextYear = month === 12 ? year + 1 : year;
+		const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+		return { startDate, endDate };
+	};
+
+	const { startDate, endDate } = getMonthRange(selectedMonthKey);
+
+	// Query transactions from the database, filtered by selected month
+	const { data: transactions } = useLiveQuery(
+		(q) =>
+			q
+				.from({ transaction: transactionsCollection })
+				.where(({ transaction }) => gte(transaction.date, startDate))
+				.where(({ transaction }) => lt(transaction.date, endDate))
+				.select(({ transaction }) => ({
+					...transaction,
+				})),
+		[selectedYear, selectedMonth],
 	);
 
 	// Query budget categories from the database
@@ -301,7 +336,13 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-col items-center p-0 sm:p-6 md:p-10 h-screen">
-			<div className="w-full max-w-6xl mb-4 flex justify-end">
+			<div className="w-full max-w-6xl mb-4 flex items-center justify-between">
+				<MonthYearSelector
+					selectedYear={selectedYear}
+					selectedMonth={selectedMonth}
+					onYearChange={setSelectedYear}
+					onMonthChange={setSelectedMonth}
+				/>
 				<input
 					type="file"
 					ref={fileInputRef}
@@ -381,7 +422,7 @@ function RouteComponent() {
 				<div className="mt-4 text-sm text-gray-600">Uploaded: {fileName}</div>
 			)}
 
-			{transactions && transactions.length > 0 && (
+			{transactions && (
 				<div className="mt-6 w-full max-w-6xl">
 					<h2 className="text-xl font-semibold mb-4">
 						Transactions ({transactions.length} total)
@@ -399,7 +440,7 @@ function RouteComponent() {
 							</thead>
 							<tbody>
 								{transactions
-									.sort((a, b) => a.date - b.date)
+									.sort((a, b) => a.date.localeCompare(b.date))
 									.map((transaction) => {
 										const isExpanded = expandedTransactionId === transaction.id;
 										const hasSplits =
@@ -416,12 +457,20 @@ function RouteComponent() {
 											<Fragment key={transaction.id}>
 												<tr className="border-b hover:bg-gray-50">
 													<td className="p-3 whitespace-nowrap">
-														{new Date(transaction.date).getMonth() + 1}/
-														{new Date(transaction.date).getDate()}
-														{new Date(transaction.date).getUTCFullYear() ===
-														new Date().getUTCFullYear()
-															? ""
-															: `/${new Date(transaction.date).getUTCFullYear()}`}
+														{(() => {
+															const [year, month, day] =
+																transaction.date.split("-");
+															const currentYear = new Date().getFullYear();
+															const monthNum = Number.parseInt(month, 10);
+															const dayNum = Number.parseInt(day, 10);
+															const yearNum = Number.parseInt(year, 10);
+															return (
+																<>
+																	{monthNum}/{dayNum}
+																	{yearNum !== currentYear ? `/${yearNum}` : ""}
+																</>
+															);
+														})()}
 													</td>
 													<td className="p-3 text-xs text-gray-600 whitespace-pre-line">
 														{transaction.description.replaceAll("<br />", "\n")}

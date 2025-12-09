@@ -1,7 +1,9 @@
-import { useLiveQuery } from "@tanstack/react-db";
+import { gte, lt, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { MonthYearSelector } from "@/components/MonthYearSelector";
 import {
 	Card,
 	CardContent,
@@ -48,13 +50,46 @@ const CHART_COLORS = [
 ];
 
 function RouteComponent() {
-	// Query transactions from the database
-	const { data: transactions } = useLiveQuery((q) =>
-		q
-			.from({ transaction: transactionsCollection })
-			.select(({ transaction }) => ({
-				...transaction,
-			})),
+	// Get current year and month
+	const now = new Date();
+	const currentYear = now.getFullYear();
+	const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+	// State for selected year and month, defaulting to current
+	const [selectedYear, setSelectedYear] = useState<string>(
+		currentYear.toString(),
+	);
+	const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+
+	// Combine year and month for query
+	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
+
+	// Calculate start and end dates for the selected month
+	const getMonthRange = (monthKey: string) => {
+		const [year, month] = monthKey.split("-").map(Number);
+		const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+
+		// Calculate next month
+		const nextMonth = month === 12 ? 1 : month + 1;
+		const nextYear = month === 12 ? year + 1 : year;
+		const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+		return { startDate, endDate };
+	};
+
+	const { startDate, endDate } = getMonthRange(selectedMonthKey);
+
+	// Query transactions from the database, filtered by selected month
+	const { data: transactions } = useLiveQuery(
+		(q) =>
+			q
+				.from({ transaction: transactionsCollection })
+				.where(({ transaction }) => gte(transaction.date, startDate))
+				.where(({ transaction }) => lt(transaction.date, endDate))
+				.select(({ transaction }) => ({
+					...transaction,
+				})),
+		[selectedYear, selectedMonth],
 	);
 
 	// Query budget categories from the database
@@ -178,7 +213,15 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-col p-10 max-w-7xl mx-auto">
-			<h1 className="text-3xl font-bold mb-8">Overview</h1>
+			<div className="flex items-center justify-between mb-8">
+				<h1 className="text-3xl font-bold">Overview</h1>
+				<MonthYearSelector
+					selectedYear={selectedYear}
+					selectedMonth={selectedMonth}
+					onYearChange={setSelectedYear}
+					onMonthChange={setSelectedMonth}
+				/>
+			</div>
 
 			{/* Statistics Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

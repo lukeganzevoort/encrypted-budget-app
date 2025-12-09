@@ -27,7 +27,7 @@ const TransactionSplitSchema = z.object({
 
 const TransactionSchema = z.object({
 	id: z.string(),
-	date: z.number(),
+	date: z.string(), // Format: "YYYY-MM-DD"
 	description: z.string(),
 	amount: z.number(),
 	accountId: z.string(),
