@@ -1,4 +1,4 @@
-import { gte, lt, useLiveQuery } from "@tanstack/react-db";
+import { eq, gte, lt, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
@@ -27,7 +27,10 @@ import {
 	budgetCategoriesCollection,
 	transactionsCollection,
 } from "@/db-collections/index";
-import { INCOME_CATEGORY_ID } from "@/lib/initialization";
+import {
+	getIncomeCategoryIdForMonth,
+	INCOME_CATEGORY_ID,
+} from "@/lib/initialization";
 
 export const Route = createFileRoute("/app/overview")({
 	component: RouteComponent,
@@ -63,6 +66,7 @@ function RouteComponent() {
 
 	// Combine year and month for query
 	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
+	const incomeCategoryId = getIncomeCategoryIdForMonth(selectedMonthKey);
 
 	// Calculate start and end dates for the selected month
 	const getMonthRange = (monthKey: string) => {
@@ -92,11 +96,16 @@ function RouteComponent() {
 		[selectedYear, selectedMonth],
 	);
 
-	// Query budget categories from the database
-	const { data: budgetCategories } = useLiveQuery((q) =>
-		q.from({ category: budgetCategoriesCollection }).select(({ category }) => ({
-			...category,
-		})),
+	// Query budget categories from the database, filtered by selected month
+	const { data: budgetCategories } = useLiveQuery(
+		(q) =>
+			q
+				.from({ category: budgetCategoriesCollection })
+				.where(({ category }) => eq(category.month, selectedMonthKey))
+				.select(({ category }) => ({
+					...category,
+				})),
+		[selectedYear, selectedMonth],
 	);
 
 	const uncategorizedCategory: BudgetCategory = {
@@ -106,6 +115,7 @@ function RouteComponent() {
 		icon: "CircleQuestionMark",
 		color: "#9ca3af",
 		budgetedAmount: 0,
+		month: selectedMonthKey,
 	};
 
 	// Calculate spending by category
@@ -193,6 +203,7 @@ function RouteComponent() {
 	});
 
 	// Calculate total spending
+	// Note: Transactions still use the base INCOME_CATEGORY_ID, not month-specific
 	const totalSpending =
 		transactions
 			?.filter((t) => t.categoryId !== INCOME_CATEGORY_ID)
@@ -298,7 +309,7 @@ function RouteComponent() {
 
 				// Add all expense categories
 				budgetCategories
-					?.filter((cat) => cat.id !== INCOME_CATEGORY_ID)
+					?.filter((cat) => cat.id !== incomeCategoryId)
 					.forEach((category) => {
 						const spending = categorySpending.get(category.id) || 0;
 						const fill =
@@ -331,8 +342,7 @@ function RouteComponent() {
 				});
 
 				const hasExpenseCategories =
-					budgetCategories?.some((cat) => cat.id !== INCOME_CATEGORY_ID) ??
-					false;
+					budgetCategories?.some((cat) => cat.id !== incomeCategoryId) ?? false;
 
 				if (!hasExpenseCategories) {
 					return (

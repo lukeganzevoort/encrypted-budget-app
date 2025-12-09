@@ -1,9 +1,18 @@
-import { useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { IconColorPicker } from "@/components/IconColorPicker";
+import { MonthYearSelector } from "@/components/MonthYearSelector";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,7 +20,10 @@ import {
 	budgetCategoriesCollection,
 } from "@/db-collections/index";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
-import { INCOME_CATEGORY_ID } from "@/lib/initialization";
+import {
+	DEFAULT_CATEGORIES,
+	getIncomeCategoryIdForMonth,
+} from "@/lib/initialization";
 import { generateHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/budget")({
@@ -32,23 +44,91 @@ function RouteComponent() {
 		null,
 	);
 	const [editingCategoryName, setEditingCategoryName] = useState<string>("");
+	const [showCopyDialog, setShowCopyDialog] = useState(false);
+	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+	const [copySource, setCopySource] = useState<
+		"current" | "last" | "default" | null
+	>(null);
 
-	// Query budget categories from the database
-	const { data: budgetCategories } = useLiveQuery((q) =>
-		q.from({ category: budgetCategoriesCollection }).select(({ category }) => ({
-			...category,
-		})),
+	// Get current year and month
+	const now = new Date();
+	const currentYear = now.getFullYear();
+	const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+	const currentMonthKey = `${currentYear}-${currentMonth}`;
+
+	// State for selected year and month, defaulting to current
+	const [selectedYear, setSelectedYear] = useState<string>(
+		currentYear.toString(),
 	);
+	const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+
+	// Combine year and month for query (format: "YYYY-MM")
+	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
+
+	// Query budget categories from the database, filtered by selected month
+	const { data: budgetCategories } = useLiveQuery(
+		(q) =>
+			q
+				.from({ category: budgetCategoriesCollection })
+				.where(({ category }) => eq(category.month, selectedMonthKey))
+				.select(({ category }) => ({
+					...category,
+				})),
+		[selectedYear, selectedMonth],
+	);
+
+	// Query budget categories from current month
+	const { data: currentMonthCategories } = useLiveQuery(
+		(q) =>
+			q
+				.from({ category: budgetCategoriesCollection })
+				.where(({ category }) => eq(category.month, currentMonthKey))
+				.select(({ category }) => ({
+					...category,
+				})),
+		[],
+	);
+
+	// Calculate last month key
+	const getLastMonthKey = (): string => {
+		const date = new Date(
+			Number.parseInt(selectedYear),
+			Number.parseInt(selectedMonth) - 1,
+		);
+		date.setMonth(date.getMonth() - 1);
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, "0");
+		return `${year}-${month}`;
+	};
+
+	const lastMonthKey = getLastMonthKey();
+
+	// Query budget categories from last month
+	const { data: lastMonthCategories } = useLiveQuery(
+		(q) =>
+			q
+				.from({ category: budgetCategoriesCollection })
+				.where(({ category }) => eq(category.month, lastMonthKey))
+				.select(({ category }) => ({
+					...category,
+				})),
+		[selectedYear, selectedMonth],
+	);
+
+	// Get income category ID for current month
+	const incomeCategoryId = getIncomeCategoryIdForMonth(selectedMonthKey);
 
 	// Initialize income from Income category
 	useEffect(() => {
 		const incomeCategory = budgetCategories?.find(
-			(category) => category.id === INCOME_CATEGORY_ID,
+			(category) => category.id === incomeCategoryId,
 		);
 		if (incomeCategory) {
 			setMonthlyIncome(incomeCategory.budgetedAmount.toString());
+		} else {
+			setMonthlyIncome("");
 		}
-	}, [budgetCategories]);
+	}, [budgetCategories, incomeCategoryId]);
 
 	// Update local categories state when database changes
 	useEffect(() => {
@@ -65,23 +145,24 @@ function RouteComponent() {
 		}
 
 		const incomeCategory = budgetCategories?.find(
-			(category) => category.id === INCOME_CATEGORY_ID,
+			(category) => category.id === incomeCategoryId,
 		);
 
 		if (incomeCategory) {
 			// Update existing Income category
-			budgetCategoriesCollection.update(INCOME_CATEGORY_ID, (item) => {
+			budgetCategoriesCollection.update(incomeCategoryId, (item) => {
 				item.budgetedAmount = income;
 			});
 		} else {
 			// Create Income category if it doesn't exist
 			const newIncomeCategory: BudgetCategory = {
-				id: INCOME_CATEGORY_ID,
+				id: incomeCategoryId,
 				name: "Income",
 				budgetedAmount: income,
 				order: 0,
 				icon: "DollarSign",
 				color: "#10b981",
+				month: selectedMonthKey,
 			};
 			budgetCategoriesCollection.insert(newIncomeCategory);
 		}
@@ -110,6 +191,7 @@ function RouteComponent() {
 			order,
 			icon: newCategoryIcon,
 			color: newCategoryColor,
+			month: selectedMonthKey,
 		};
 
 		budgetCategoriesCollection.insert(category);
@@ -169,14 +251,137 @@ function RouteComponent() {
 		setEditingCategoryName("");
 	};
 
+	// Check if there are existing categories (excluding income)
+	const hasExistingCategories = () => {
+		return categories.filter((cat) => cat.id !== incomeCategoryId).length > 0;
+	};
+
+	// Get available copy sources
+	const getAvailableCopySources = () => {
+		const sources: Array<{
+			value: "current" | "last" | "default";
+			label: string;
+		}> = [];
+
+		// Add current month option if selected month is not current month and there are categories
+		if (selectedMonthKey !== currentMonthKey) {
+			const currentMonthNonIncomeCategories =
+				currentMonthCategories?.filter(
+					(cat) => cat.id !== getIncomeCategoryIdForMonth(currentMonthKey),
+				) ?? [];
+			if (currentMonthNonIncomeCategories.length > 0) {
+				sources.push({
+					value: "current",
+					label: `Default (${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })})`,
+				});
+			}
+		}
+
+		// Add last month option if there are categories for last month
+		const lastMonthNonIncomeCategories =
+			lastMonthCategories?.filter(
+				(cat) => cat.id !== getIncomeCategoryIdForMonth(lastMonthKey),
+			) ?? [];
+		if (lastMonthNonIncomeCategories.length > 0) {
+			sources.push({
+				value: "last",
+				label: `Last Month (${new Date(lastMonthKey).toLocaleDateString("en-US", { month: "long", year: "numeric" })})`,
+			});
+		}
+
+		// Always add default categories option
+		if (sources.length === 0) {
+			sources.push({ value: "default", label: "Default Categories" });
+		}
+
+		return sources;
+	};
+
+	const handleCopyBudget = async (source: "current" | "last" | "default") => {
+		// Check if there are existing categories
+		if (hasExistingCategories()) {
+			setCopySource(source);
+			setShowConfirmDialog(true);
+			setShowCopyDialog(false);
+			return;
+		}
+
+		// Proceed with copy if no existing categories
+		await performCopy(source);
+		setShowCopyDialog(false);
+	};
+
+	const performCopy = async (source: "current" | "last" | "default") => {
+		let categoriesToCopy: Omit<BudgetCategory, "id" | "month">[] = [];
+
+		if (source === "current") {
+			// Copy from current month (excluding income)
+			categoriesToCopy =
+				currentMonthCategories.map((cat) => ({
+					name: cat.name,
+					budgetedAmount: cat.budgetedAmount,
+					order: cat.order,
+					icon: cat.icon,
+					color: cat.color,
+				})) ?? [];
+		} else if (source === "last") {
+			// Copy from last month (excluding income)
+			categoriesToCopy =
+				lastMonthCategories.map((cat) => ({
+					name: cat.name,
+					budgetedAmount: cat.budgetedAmount,
+					order: cat.order,
+					icon: cat.icon,
+					color: cat.color,
+				})) ?? [];
+		} else {
+			// Copy from default categories
+			categoriesToCopy = DEFAULT_CATEGORIES.map((cat, index) => ({
+				name: cat.name,
+				budgetedAmount: cat.amount,
+				order: index,
+				icon: cat.icon,
+				color: cat.color,
+			}));
+		}
+
+		// Delete existing categories (excluding income)
+		const categoriesToDelete = categories;
+		for (const category of categoriesToDelete) {
+			budgetCategoriesCollection.delete(category.id);
+		}
+
+		// Insert new categories
+		for (const categoryData of categoriesToCopy) {
+			const id =
+				categoryData.name === "Income"
+					? incomeCategoryId
+					: await generateHash(
+							`${categoryData.name}-${Date.now()}-${Math.random()}`,
+						);
+			const category: BudgetCategory = {
+				id,
+				...categoryData,
+				month: selectedMonthKey,
+			};
+			budgetCategoriesCollection.insert(category);
+		}
+	};
+
+	const handleConfirmCopy = async () => {
+		if (copySource) {
+			await performCopy(copySource);
+			setShowConfirmDialog(false);
+			setCopySource(null);
+		}
+	};
+
 	// Calculate totals
-	const incomeCategory = categories.find(
-		(cat) => cat.id === INCOME_CATEGORY_ID,
-	);
+	const incomeCategory = categories.find((cat) => cat.id === incomeCategoryId);
 	const currentIncome = incomeCategory?.budgetedAmount || 0;
 	// Exclude Income category from total budgeted (only count expenses)
 	const totalBudgeted = categories
-		.filter((cat) => cat.id !== INCOME_CATEGORY_ID)
+		.filter((cat) => cat.id !== incomeCategoryId)
 		.reduce((sum, cat) => sum + cat.budgetedAmount, 0);
 	const remainingBalance = currentIncome - totalBudgeted;
 
@@ -185,30 +390,23 @@ function RouteComponent() {
 
 	return (
 		<div className="flex flex-col p-10 max-w-4xl mx-auto">
-			<h1 className="text-3xl font-bold mb-8">Budget</h1>
-
-			{/* Monthly Income Section */}
-			<div className="mb-8 p-6 bg-white border rounded-lg shadow-sm">
-				<h2 className="text-xl font-semibold mb-4">Monthly Income</h2>
-				<div className="flex gap-4 items-end">
-					<div className="flex-1">
-						<Label htmlFor={monthlyIncomeId}>Income Amount</Label>
-						<Input
-							id={monthlyIncomeId}
-							type="number"
-							placeholder="Enter monthly income"
-							value={monthlyIncome}
-							onChange={(e) => setMonthlyIncome(e.target.value)}
-							onBlur={handleSaveIncome}
-							onKeyDown={(e) => {
-								if (e.key === "Enter") {
-									handleSaveIncome();
-								}
-							}}
-							className="mt-1"
-						/>
-					</div>
-					<Button onClick={handleSaveIncome}>Save Income</Button>
+			<div className="flex items-center justify-between mb-8">
+				<h1 className="text-3xl font-bold">Budget</h1>
+				<div className="flex items-center gap-4">
+					<Button
+						variant="outline"
+						onClick={() => setShowCopyDialog(true)}
+						className="flex items-center gap-2"
+					>
+						<Copy size={16} />
+						Copy Budget
+					</Button>
+					<MonthYearSelector
+						selectedYear={selectedYear}
+						selectedMonth={selectedMonth}
+						onYearChange={setSelectedYear}
+						onMonthChange={setSelectedMonth}
+					/>
 				</div>
 			</div>
 
@@ -244,11 +442,36 @@ function RouteComponent() {
 			<div className="mb-8 p-6 bg-white border rounded-lg shadow-sm">
 				<h2 className="text-xl font-semibold mb-4">Budget Categories</h2>
 
+				{/* Monthly Income Section */}
+				<div className="mb-6 pb-6 border-b">
+					<h3 className="text-lg font-medium mb-3">Monthly Income</h3>
+					<div className="flex gap-4 items-end">
+						<div className="flex-1">
+							<Label htmlFor={monthlyIncomeId}>Income Amount</Label>
+							<Input
+								id={monthlyIncomeId}
+								type="number"
+								placeholder="Enter monthly income"
+								value={monthlyIncome}
+								onChange={(e) => setMonthlyIncome(e.target.value)}
+								onBlur={handleSaveIncome}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleSaveIncome();
+									}
+								}}
+								className="mt-1"
+							/>
+						</div>
+						<Button onClick={handleSaveIncome}>Save Income</Button>
+					</div>
+				</div>
+
 				{/* Categories List */}
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
 						{sortedCategories
-							.filter((category) => category.id !== INCOME_CATEGORY_ID)
+							.filter((category) => category.id !== incomeCategoryId)
 							.map((category) => {
 								return (
 									<div
@@ -380,6 +603,63 @@ function RouteComponent() {
 					</div>
 				</div>
 			</div>
+
+			{/* Copy Budget Dialog */}
+			<Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Copy Budget Categories</DialogTitle>
+						<DialogDescription>
+							Select a source to copy budget categories from:
+						</DialogDescription>
+					</DialogHeader>
+					<div className="py-4 space-y-2">
+						{getAvailableCopySources().map((source) => (
+							<Button
+								key={source.value}
+								variant="outline"
+								className="w-full justify-start"
+								onClick={() => handleCopyBudget(source.value)}
+							>
+								{source.label}
+							</Button>
+						))}
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setShowCopyDialog(false)}>
+							Cancel
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Confirmation Dialog */}
+			<Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Confirm Copy Budget</DialogTitle>
+						<DialogDescription>
+							This will delete all existing budget categories for this month and
+							replace them with the selected source. This action cannot be
+							undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setShowConfirmDialog(false);
+								setCopySource(null);
+							}}
+						>
+							Cancel
+						</Button>
+						<Button variant="destructive" onClick={handleConfirmCopy}>
+							Confirm
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

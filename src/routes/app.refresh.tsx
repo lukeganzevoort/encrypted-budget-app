@@ -6,7 +6,10 @@ import {
 	accountsCollection,
 	budgetCategoriesCollection,
 } from "@/db-collections/index";
-import { INCOME_CATEGORY_ID, initializeDefaults } from "@/lib/initialization";
+import {
+	getIncomeCategoryIdForMonth,
+	initializeDefaults,
+} from "@/lib/initialization";
 
 export const Route = createFileRoute("/app/refresh")({
 	component: RouteComponent,
@@ -118,10 +121,19 @@ function RouteComponent() {
 					<div>Accounts: {accounts?.length ?? 0}</div>
 					<div>Budget Categories: {budgetCategories?.length ?? 0}</div>
 					<div>
-						Income Category:{" "}
-						{budgetCategories?.some((cat) => cat.id === INCOME_CATEGORY_ID)
-							? "Exists"
-							: "Missing"}
+						Income Category (Current Month): {(() => {
+							const now = new Date();
+							const currentMonth = `${now.getFullYear()}-${String(
+								now.getMonth() + 1,
+							).padStart(2, "0")}`;
+							const incomeCategoryId =
+								getIncomeCategoryIdForMonth(currentMonth);
+							return budgetCategories?.some(
+								(cat) => cat.id === incomeCategoryId,
+							)
+								? "Exists"
+								: "Missing";
+						})()}
 					</div>
 				</div>
 			</div>

@@ -54,6 +54,7 @@ const BudgetCategorySchema = z.object({
 	order: z.number(),
 	icon: z.string().optional(),
 	color: z.string().optional(),
+	month: z.string(), // Format: "YYYY-MM"
 });
 
 export type BudgetCategory = z.infer<typeof BudgetCategorySchema>;
