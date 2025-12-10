@@ -1,6 +1,7 @@
 import {
 	and,
 	gt,
+	gte,
 	isUndefined,
 	lte,
 	or,
@@ -17,11 +18,13 @@ import { Label } from "@/components/ui/label";
 import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
+	getBudgetedAmountForMonth,
 	type IncomeCategory,
 	incomeCategoriesCollection,
+	isCategoryActiveForMonth,
 } from "@/db-collections/index";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
-import { generateHash } from "@/lib/utils";
+import { getPreviousMonth } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/budget")({
 	component: RouteComponent,
@@ -55,10 +58,7 @@ function RouteComponent() {
 	// Combine year and month for query (format: "YYYY-MM")
 	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
 
-	// Query all budget categories and filter client-side for active ones
-	// This is necessary because we need to check both startMonth <= selectedMonth
-	// and (endMonth >= selectedMonth OR endMonth is null)
-	const { data: allBudgetCategories } = useLiveQuery(
+	const { data: categories } = useLiveQuery(
 		(q) =>
 			q
 				.from({ category: budgetCategoriesCollection })
@@ -67,7 +67,7 @@ function RouteComponent() {
 						lte(category.startMonth, selectedMonthKey),
 						or(
 							isUndefined(category.endMonth),
-							gt(category.endMonth, selectedMonthKey),
+							gte(category.endMonth, selectedMonthKey),
 						),
 					),
 				)
@@ -87,11 +87,7 @@ function RouteComponent() {
 		[selectedYear, selectedMonth],
 	);
 
-	console.log("incomeCategory", incomeCategory);
-	console.log("selectedMonthKey", selectedMonthKey);
-
 	// Initialize income from Income category
-	// Use allBudgetCategories directly to avoid dependency on filtered array
 	useEffect(() => {
 		if (incomeCategory) {
 			setMonthlyIncome(incomeCategory.budgetedAmount.toString());
@@ -99,9 +95,6 @@ function RouteComponent() {
 			setMonthlyIncome("");
 		}
 	}, [incomeCategory]);
-
-	// Use budgetCategories directly instead of maintaining separate state
-	const categories = allBudgetCategories ?? [];
 
 	const handleSaveIncome = async () => {
 		const income = Number.parseFloat(monthlyIncome);
@@ -137,19 +130,19 @@ function RouteComponent() {
 			return;
 		}
 
-		const id = await generateHash(
-			`${newCategoryName}-${Date.now()}-${Math.random()}`,
-		);
-		const order = categories.length;
-
 		const category: BudgetCategory = {
-			id,
+			id: crypto.randomUUID(),
 			name: newCategoryName,
-			budgetedAmount: amount,
-			order,
+			order: (categories.length + 1) * 100,
 			icon: newCategoryIcon,
 			color: newCategoryColor,
 			startMonth: selectedMonthKey,
+			monthlyBudgets: [
+				{
+					budgetedAmount: amount,
+					startMonth: selectedMonthKey,
+				},
+			],
 		};
 
 		budgetCategoriesCollection.insert(category);
@@ -159,18 +152,17 @@ function RouteComponent() {
 		setNewCategoryColor(DEFAULT_COLOR);
 	};
 
-	const handleDeleteCategory = (categoryId: string) => {
-		const category = categories.find((cat) => cat.id === categoryId);
-		if (!category) {
-			alert("Category not found");
-			return;
-		}
-
+	const handleDeleteCategory = (
+		category: Pick<BudgetCategory, "id" | "monthlyBudgets" | "startMonth">,
+	) => {
 		if (category.startMonth === selectedMonthKey) {
-			budgetCategoriesCollection.delete(categoryId);
+			budgetCategoriesCollection.delete(category.id);
 		} else {
-			budgetCategoriesCollection.update(categoryId, (item) => {
-				item.endMonth = selectedMonthKey;
+			budgetCategoriesCollection.update(category.id, (item) => {
+				item.endMonth = getPreviousMonth(selectedMonthKey);
+				item.monthlyBudgets = item.monthlyBudgets.filter(
+					(mb) => mb.startMonth < selectedMonthKey,
+				);
 			});
 		}
 	};
@@ -189,76 +181,40 @@ function RouteComponent() {
 			return;
 		}
 
-		// If editing in the start month, update directly
-		if (category.startMonth === selectedMonthKey) {
-			budgetCategoriesCollection.update(categoryId, (item) => {
-				item.budgetedAmount = amount;
-			});
-		} else {
-			// Editing in a different month - need to split the category
-			await splitCategoryForEdit(category, { budgetedAmount: amount });
-		}
+		// Find or create monthly budget entry for this month
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			const existingIndex = item.monthlyBudgets.findIndex(
+				(mb) => mb.startMonth === selectedMonthKey,
+			);
+			if (existingIndex >= 0) {
+				// Update existing entry
+				item.monthlyBudgets[existingIndex].budgetedAmount = amount;
+			} else {
+				// Add new entry for this month
+				item.monthlyBudgets.push({
+					budgetedAmount: amount,
+					startMonth: selectedMonthKey,
+				});
+				// Sort by startMonth to keep them in order
+				item.monthlyBudgets.sort((a, b) =>
+					a.startMonth.localeCompare(b.startMonth),
+				);
+			}
+		});
 	};
 
 	const handleUpdateIcon = async (categoryId: string, icon: string) => {
-		const category = categories.find((cat) => cat.id === categoryId);
-		if (!category) {
-			return;
-		}
-
-		// If editing in the start month, update directly
-		if (category.startMonth === selectedMonthKey) {
-			budgetCategoriesCollection.update(categoryId, (item) => {
-				item.icon = icon;
-			});
-		} else {
-			// Editing in a different month - need to split the category
-			await splitCategoryForEdit(category, { icon });
-		}
+		// Icon is shared across all months, so update directly
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.icon = icon;
+		});
 	};
 
 	const handleUpdateColor = async (categoryId: string, color: string) => {
-		const category = categories.find((cat) => cat.id === categoryId);
-		if (!category) {
-			return;
-		}
-
-		// If editing in the start month, update directly
-		if (category.startMonth === selectedMonthKey) {
-			budgetCategoriesCollection.update(categoryId, (item) => {
-				item.color = color;
-			});
-		} else {
-			// Editing in a different month - need to split the category
-			await splitCategoryForEdit(category, { color });
-		}
-	};
-
-	/**
-	 * Split a category when editing in a non-start month
-	 * Sets the old category's endMonth to the previous month and creates a new category
-	 */
-	const splitCategoryForEdit = async (
-		category: BudgetCategory,
-		updates: Partial<BudgetCategory>,
-	) => {
-		// Update the old category to end at the previous month
-		budgetCategoriesCollection.update(category.id, (item) => {
-			item.endMonth = selectedMonthKey;
+		// Color is shared across all months, so update directly
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.color = color;
 		});
-
-		// Create a new category starting from the selected month
-		const newId = await generateHash(
-			`${category.name}-${Date.now()}-${Math.random()}`,
-		);
-		const newCategory: BudgetCategory = {
-			...category,
-			...updates,
-			id: newId,
-			startMonth: selectedMonthKey,
-		};
-
-		budgetCategoriesCollection.insert(newCategory);
 	};
 
 	const handleStartEditingName = (categoryId: string, currentName: string) => {
@@ -272,22 +228,10 @@ function RouteComponent() {
 			return;
 		}
 
-		const category = categories.find((cat) => cat.id === categoryId);
-		if (!category) {
-			return;
-		}
-
-		// If editing in the start month, update directly
-		if (category.startMonth === selectedMonthKey) {
-			budgetCategoriesCollection.update(categoryId, (item) => {
-				item.name = editingCategoryName.trim();
-			});
-		} else {
-			// Editing in a different month - need to split the category
-			await splitCategoryForEdit(category, {
-				name: editingCategoryName.trim(),
-			});
-		}
+		// Name is shared across all months, so update directly
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			item.name = editingCategoryName.trim();
+		});
 
 		setEditingCategoryId(null);
 		setEditingCategoryName("");
@@ -302,7 +246,7 @@ function RouteComponent() {
 	const currentIncome = incomeCategory?.budgetedAmount || 0;
 	// Exclude Income category from total budgeted (only count expenses)
 	const totalBudgeted = categories.reduce(
-		(sum, cat) => sum + cat.budgetedAmount,
+		(sum, cat) => sum + getBudgetedAmountForMonth(cat, selectedMonthKey),
 		0,
 	);
 	const remainingBalance = currentIncome - totalBudgeted;
@@ -433,7 +377,10 @@ function RouteComponent() {
 									<div className="w-40">
 										<Input
 											type="number"
-											value={category.budgetedAmount}
+											value={getBudgetedAmountForMonth(
+												category,
+												selectedMonthKey,
+											)}
 											onChange={(e) =>
 												handleUpdateCategory(category.id, e.target.value)
 											}
@@ -443,7 +390,7 @@ function RouteComponent() {
 									<Button
 										variant="ghost"
 										size="sm"
-										onClick={() => handleDeleteCategory(category.id)}
+										onClick={() => handleDeleteCategory(category)}
 										className="flex items-center gap-1 hover:text-red-500"
 									>
 										<Trash2 size={16} />

@@ -1,4 +1,4 @@
-import { gte, lt, lte, useLiveQuery } from "@tanstack/react-db";
+import { gte, lt, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
@@ -25,12 +25,11 @@ import {
 import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
+	getBudgetedAmountForMonth,
+	isCategoryActiveForMonth,
 	transactionsCollection,
 } from "@/db-collections/index";
-import {
-	getIncomeCategoryIdForMonth,
-	INCOME_CATEGORY_ID,
-} from "@/lib/initialization";
+import { INCOME_CATEGORY_ID } from "@/lib/initialization";
 import { formatDollars } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/overview")({
@@ -67,7 +66,6 @@ function RouteComponent() {
 
 	// Combine year and month for query
 	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
-	const incomeCategoryId = getIncomeCategoryIdForMonth(selectedMonthKey);
 
 	// Calculate start and end dates for the selected month
 	const getMonthRange = (monthKey: string) => {
@@ -102,7 +100,6 @@ function RouteComponent() {
 		(q) =>
 			q
 				.from({ category: budgetCategoriesCollection })
-				.where(({ category }) => lte(category.startMonth, selectedMonthKey))
 				.select(({ category }) => ({
 					...category,
 				})),
@@ -110,15 +107,9 @@ function RouteComponent() {
 	);
 
 	// Filter categories that are active for the selected month
-	const budgetCategories = allBudgetCategories?.filter((category) => {
-		if (category.startMonth > selectedMonthKey) {
-			return false;
-		}
-		if (category.endMonth && category.endMonth < selectedMonthKey) {
-			return false;
-		}
-		return true;
-	});
+	const budgetCategories = allBudgetCategories?.filter((category) =>
+		isCategoryActiveForMonth(category, selectedMonthKey),
+	);
 
 	const uncategorizedCategory: BudgetCategory = {
 		id: "uncategorized",
@@ -126,8 +117,13 @@ function RouteComponent() {
 		name: "Uncategorized",
 		icon: "CircleQuestionMark",
 		color: "#9ca3af",
-		budgetedAmount: 0,
 		startMonth: selectedMonthKey,
+		monthlyBudgets: [
+			{
+				budgetedAmount: 0,
+				startMonth: selectedMonthKey,
+			},
+		],
 	};
 
 	// Calculate spending by category
@@ -267,7 +263,9 @@ function RouteComponent() {
 				<Card>
 					<CardHeader className="pb-2">
 						<CardDescription>Total Income</CardDescription>
-						<CardTitle className="text-3xl text-green-600">
+						<CardTitle
+							className={`text-3xl ${incomeSum >= 0 ? "text-green-600" : "text-red-600"}`}
+						>
 							{formatDollars(incomeSum)}
 						</CardTitle>
 					</CardHeader>
@@ -328,20 +326,18 @@ function RouteComponent() {
 				}> = [];
 
 				// Add all expense categories
-				budgetCategories
-					?.filter((cat) => cat.id !== incomeCategoryId)
-					.forEach((category) => {
-						const spending = categorySpending.get(category.id) || 0;
-						const fill =
-							category.color ||
-							CHART_COLORS[breakdownData.length % CHART_COLORS.length];
-						breakdownData.push({
-							categoryId: category.id,
-							category,
-							amount: spending,
-							fill,
-						});
+				budgetCategories.forEach((category) => {
+					const spending = categorySpending.get(category.id) || 0;
+					const fill =
+						category.color ||
+						CHART_COLORS[breakdownData.length % CHART_COLORS.length];
+					breakdownData.push({
+						categoryId: category.id,
+						category,
+						amount: spending,
+						fill,
 					});
+				});
 
 				// Add uncategorized if there are any
 				if (uncategorizedTotal > 0) {
@@ -361,10 +357,7 @@ function RouteComponent() {
 					return a.category.name.localeCompare(b.category.name);
 				});
 
-				const hasExpenseCategories =
-					budgetCategories?.some((cat) => cat.id !== incomeCategoryId) ?? false;
-
-				if (!hasExpenseCategories) {
+				if (budgetCategories.length === 0) {
 					return (
 						<Card>
 							<CardContent className="flex items-center justify-center py-16">
@@ -439,9 +432,13 @@ function RouteComponent() {
 								<div className="space-y-4">
 									{breakdownData.length > 0 ? (
 										breakdownData.map((item) => {
+											const budgetedAmount = getBudgetedAmountForMonth(
+												item.category,
+												selectedMonthKey,
+											);
 											const percentage =
-												item.category.budgetedAmount > 0
-													? (item.amount / item.category.budgetedAmount) * 100
+												budgetedAmount > 0
+													? (item.amount / budgetedAmount) * 100
 													: item.amount > 0
 														? 100
 														: 0;
@@ -475,7 +472,7 @@ function RouteComponent() {
 																	/>
 																</div>
 																<span className="text-xs text-muted-foreground w-12 text-right">
-																	{item.category.budgetedAmount > 0
+																	{budgetedAmount > 0
 																		? `${percentage.toFixed(1)}%`
 																		: "—"}
 																</span>
@@ -483,8 +480,7 @@ function RouteComponent() {
 														</div>
 													</TooltipTrigger>
 													<TooltipContent side="top" align="end">
-														Budgeted:{" "}
-														{formatDollars(item.category.budgetedAmount)}
+														Budgeted: {formatDollars(budgetedAmount)}
 													</TooltipContent>
 												</Tooltip>
 											);

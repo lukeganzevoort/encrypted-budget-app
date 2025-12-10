@@ -6,10 +6,7 @@ import {
 	accountsCollection,
 	budgetCategoriesCollection,
 } from "@/db-collections/index";
-import {
-	getIncomeCategoryIdForMonth,
-	initializeDefaults,
-} from "@/lib/initialization";
+import { initializeDefaults } from "@/lib/initialization";
 
 export const Route = createFileRoute("/app/refresh")({
 	component: RouteComponent,
@@ -43,7 +40,7 @@ function RouteComponent() {
 
 		try {
 			const initResult = await initializeDefaults(accounts, budgetCategories);
-			setResult(initResult);
+			setResult({ ...initResult, incomeCategoryCreated: false });
 		} catch (error) {
 			console.error("Initialization error:", error);
 			alert("Error during initialization. Check console for details.");
@@ -120,21 +117,7 @@ function RouteComponent() {
 				<div className="space-y-1 text-sm text-gray-700">
 					<div>Accounts: {accounts?.length ?? 0}</div>
 					<div>Budget Categories: {budgetCategories?.length ?? 0}</div>
-					<div>
-						Income Category (Current Month): {(() => {
-							const now = new Date();
-							const currentMonth = `${now.getFullYear()}-${String(
-								now.getMonth() + 1,
-							).padStart(2, "0")}`;
-							const incomeCategoryId =
-								getIncomeCategoryIdForMonth(currentMonth);
-							return budgetCategories?.some(
-								(cat) => cat.id === incomeCategoryId,
-							)
-								? "Exists"
-								: "Missing";
-						})()}
-					</div>
+					<div>Income Category (Current Month): N A</div>
 				</div>
 			</div>
 		</div>

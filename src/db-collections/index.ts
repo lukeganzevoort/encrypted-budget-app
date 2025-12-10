@@ -64,18 +64,75 @@ export const incomeCategoriesCollection = createCollection(
 	}),
 );
 
+const MonthlyBudgetSchema = z.object({
+	budgetedAmount: z.number(),
+	startMonth: z.string(), // Format: "YYYY-MM"
+});
+
+export type MonthlyBudget = z.infer<typeof MonthlyBudgetSchema>;
+
 const BudgetCategorySchema = z.object({
 	id: z.string(),
 	name: z.string(),
-	budgetedAmount: z.number(),
 	order: z.number(),
 	icon: z.string().optional(),
 	color: z.string().optional(),
-	startMonth: z.string(), // Format: "YYYY-MM"
-	endMonth: z.string().optional(), // Format: "YYYY-MM"
+	monthlyBudgets: z.array(MonthlyBudgetSchema),
+	startMonth: z.string(), // Format: "YYYY-MM" - the month this category was created (inclusive)
+	endMonth: z.string().optional(), // Format: "YYYY-MM" - if set, this category stops applying next month (inclusive)
 });
 
 export type BudgetCategory = z.infer<typeof BudgetCategorySchema>;
+
+/**
+ * Gets the budgeted amount for a specific month from a category
+ * Returns 0 if no budget exists for that month
+ */
+export function getBudgetedAmountForMonth(
+	category: BudgetCategory,
+	month: string,
+): number {
+	if (category.endMonth && category.endMonth < month) {
+		return 0;
+	}
+	// Find the most recent monthly budget that applies to the target month
+	// A budget applies if: startMonth <= month AND (endMonth is undefined OR endMonth >= month)
+	const relevantBudgets = category.monthlyBudgets
+		.filter((mb) => mb.startMonth <= month)
+		.sort((a, b) => b.startMonth.localeCompare(a.startMonth));
+
+	if (relevantBudgets.length === 0) {
+		return 0;
+	}
+
+	// Return the most recent budget (the one with the latest startMonth that applies)
+	return relevantBudgets[0].budgetedAmount;
+}
+
+/**
+ * Checks if a category is active for a specific month
+ */
+export function isCategoryActiveForMonth(
+	category: BudgetCategory,
+	month: string,
+): boolean {
+	return (
+		category.startMonth <= month &&
+		(category.endMonth === undefined || category.endMonth >= month) // endMonth is inclusive
+	);
+}
+
+/**
+ * Gets the earliest start month from a category's monthly budgets
+ */
+export function getEarliestStartMonth(category: BudgetCategory): string | null {
+	if (category.monthlyBudgets.length === 0) {
+		return null;
+	}
+	return category.monthlyBudgets
+		.map((mb) => mb.startMonth)
+		.sort((a, b) => a.localeCompare(b))[0];
+}
 
 export const budgetCategoriesCollection = createCollection(
 	localStorageCollectionOptions({

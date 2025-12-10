@@ -67,3 +67,17 @@ export function formatDollars(
 			: `$${formatted}`
 		: formatted;
 }
+
+/**
+ * Calculates the previous month from a given month in "YYYY-MM" format
+ */
+export function getPreviousMonth(monthKey: string): string {
+	const [year, month] = monthKey.split("-").map(Number);
+	let prevMonth = month - 1;
+	let prevYear = year;
+	if (prevMonth < 1) {
+		prevMonth = 12;
+		prevYear = year - 1;
+	}
+	return `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+}

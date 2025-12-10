@@ -3,6 +3,7 @@ import {
 	accountsCollection,
 	type BudgetCategory,
 	budgetCategoriesCollection,
+	isCategoryActiveForMonth,
 } from "@/db-collections/index";
 import { generateHash } from "@/lib/utils";
 
@@ -62,13 +63,6 @@ function getCurrentMonth(): string {
 }
 
 /**
- * Gets the income category ID for a specific month
- */
-export function getIncomeCategoryIdForMonth(month: string): string {
-	return `${INCOME_CATEGORY_ID}-${month}`;
-}
-
-/**
  * Initializes default budget categories for a specific month if they don't exist
  * @param budgetCategories - Current budget categories from the database
  * @param month - Month in "YYYY-MM" format (defaults to current month)
@@ -77,23 +71,17 @@ export function getIncomeCategoryIdForMonth(month: string): string {
 export async function initializeBudgetDefaults(
 	budgetCategories: BudgetCategory[] | undefined,
 	month?: string,
-): Promise<{
-	categoriesCreated: boolean;
-	incomeCategoryCreated: boolean;
-}> {
+): Promise<boolean> {
 	const targetMonth = month || getCurrentMonth();
-	const incomeCategoryId = getIncomeCategoryIdForMonth(targetMonth);
 
-	// Filter categories for the target month
+	// Filter categories that are active for the target month
 	const monthCategories =
-		budgetCategories?.filter((cat) => cat.startMonth === targetMonth) ?? [];
+		budgetCategories?.filter((cat) =>
+			isCategoryActiveForMonth(cat, targetMonth),
+		) ?? [];
 	const hasCategories = monthCategories.length > 0;
-	const hasIncomeCategory = monthCategories.some(
-		(category) => category.id === incomeCategoryId,
-	);
 
 	let categoriesCreated = false;
-	let incomeCategoryCreated = false;
 
 	// Initialize default categories for this month if none exist
 	if (!hasCategories) {
@@ -103,32 +91,23 @@ export async function initializeBudgetDefaults(
 			const category: BudgetCategory = {
 				id,
 				name: defaultCat.name,
-				budgetedAmount: defaultCat.amount,
 				order: i,
 				icon: defaultCat.icon,
 				color: defaultCat.color,
 				startMonth: targetMonth,
+				monthlyBudgets: [
+					{
+						budgetedAmount: defaultCat.amount,
+						startMonth: targetMonth,
+					},
+				],
 			};
 			budgetCategoriesCollection.insert(category);
 		}
 		categoriesCreated = true;
 	}
 
-	if (!hasIncomeCategory) {
-		const incomeCategory: BudgetCategory = {
-			id: incomeCategoryId,
-			name: "Income",
-			budgetedAmount: DEFAULT_INCOME,
-			order: 0,
-			icon: "DollarSign",
-			color: "#10b981",
-			startMonth: targetMonth,
-		};
-		budgetCategoriesCollection.insert(incomeCategory);
-		incomeCategoryCreated = true;
-	}
-
-	return { categoriesCreated, incomeCategoryCreated };
+	return categoriesCreated;
 }
 
 /**
@@ -143,7 +122,6 @@ export async function initializeDefaults(
 ): Promise<{
 	cashAccountCreated: boolean;
 	categoriesCreated: boolean;
-	incomeCategoryCreated: boolean;
 }> {
 	const [cashAccountCreated, budgetResult] = await Promise.all([
 		initializeCashAccount(accounts),
@@ -152,7 +130,6 @@ export async function initializeDefaults(
 
 	return {
 		cashAccountCreated,
-		categoriesCreated: budgetResult.categoriesCreated,
-		incomeCategoryCreated: budgetResult.incomeCategoryCreated,
+		categoriesCreated: budgetResult,
 	};
 }
