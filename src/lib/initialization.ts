@@ -11,7 +11,6 @@ export const INCOME_CATEGORY_ID = "income-category-default";
 
 export const DEFAULT_INCOME = 5000;
 export const DEFAULT_CATEGORIES = [
-	{ name: "Income", amount: 5000, icon: "DollarSign", color: "#10b981" },
 	{ name: "Giving", amount: 500, icon: "Heart", color: "#ec4899" },
 	{ name: "Saving", amount: 750, icon: "PiggyBank", color: "#10b981" },
 	{ name: "Groceries", amount: 500, icon: "ShoppingCart", color: "#f97316" },
@@ -87,7 +86,7 @@ export async function initializeBudgetDefaults(
 
 	// Filter categories for the target month
 	const monthCategories =
-		budgetCategories?.filter((cat) => cat.month === targetMonth) ?? [];
+		budgetCategories?.filter((cat) => cat.startMonth === targetMonth) ?? [];
 	const hasCategories = monthCategories.length > 0;
 	const hasIncomeCategory = monthCategories.some(
 		(category) => category.id === incomeCategoryId,
@@ -108,7 +107,7 @@ export async function initializeBudgetDefaults(
 				order: i,
 				icon: defaultCat.icon,
 				color: defaultCat.color,
-				month: targetMonth,
+				startMonth: targetMonth,
 			};
 			budgetCategoriesCollection.insert(category);
 		}
@@ -123,7 +122,7 @@ export async function initializeBudgetDefaults(
 			order: 0,
 			icon: "DollarSign",
 			color: "#10b981",
-			month: targetMonth,
+			startMonth: targetMonth,
 		};
 		budgetCategoriesCollection.insert(incomeCategory);
 		incomeCategoryCreated = true;

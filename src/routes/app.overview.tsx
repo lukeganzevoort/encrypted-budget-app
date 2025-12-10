@@ -1,4 +1,4 @@
-import { eq, gte, lt, useLiveQuery } from "@tanstack/react-db";
+import { gte, lt, lte, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
@@ -31,6 +31,7 @@ import {
 	getIncomeCategoryIdForMonth,
 	INCOME_CATEGORY_ID,
 } from "@/lib/initialization";
+import { formatDollars } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/overview")({
 	component: RouteComponent,
@@ -96,17 +97,28 @@ function RouteComponent() {
 		[selectedYear, selectedMonth],
 	);
 
-	// Query budget categories from the database, filtered by selected month
-	const { data: budgetCategories } = useLiveQuery(
+	// Query all budget categories and filter client-side for active ones
+	const { data: allBudgetCategories } = useLiveQuery(
 		(q) =>
 			q
 				.from({ category: budgetCategoriesCollection })
-				.where(({ category }) => eq(category.month, selectedMonthKey))
+				.where(({ category }) => lte(category.startMonth, selectedMonthKey))
 				.select(({ category }) => ({
 					...category,
 				})),
 		[selectedYear, selectedMonth],
 	);
+
+	// Filter categories that are active for the selected month
+	const budgetCategories = allBudgetCategories?.filter((category) => {
+		if (category.startMonth > selectedMonthKey) {
+			return false;
+		}
+		if (category.endMonth && category.endMonth < selectedMonthKey) {
+			return false;
+		}
+		return true;
+	});
 
 	const uncategorizedCategory: BudgetCategory = {
 		id: "uncategorized",
@@ -115,7 +127,7 @@ function RouteComponent() {
 		icon: "CircleQuestionMark",
 		color: "#9ca3af",
 		budgetedAmount: 0,
-		month: selectedMonthKey,
+		startMonth: selectedMonthKey,
 	};
 
 	// Calculate spending by category
@@ -202,25 +214,29 @@ function RouteComponent() {
 		};
 	});
 
-	// Calculate total spending
-	// Note: Transactions still use the base INCOME_CATEGORY_ID, not month-specific
-	const totalSpending =
-		transactions
-			?.filter((t) => t.categoryId !== INCOME_CATEGORY_ID)
-			.reduce((sum, t) => sum - t.amount, 0) || 0;
+	const incomeTransactions = transactions.filter(
+		(t) => t.categoryId === INCOME_CATEGORY_ID,
+	);
+	const expenseTransactions = transactions.filter(
+		(t) => t.categoryId !== INCOME_CATEGORY_ID,
+	);
 
-	// Calculate statistics
-	const totalTransactions = transactions?.length || 0;
-	const expenseCount =
-		transactions?.filter((t) => t.categoryId !== INCOME_CATEGORY_ID).length ||
-		0;
-	const incomeCount =
-		transactions?.filter((t) => t.categoryId === INCOME_CATEGORY_ID).length ||
-		0;
-	const totalIncome =
-		transactions
-			?.filter((t) => t.categoryId === INCOME_CATEGORY_ID)
+	// Calculate total spending
+	const transactionCount = transactions.length;
+	const incomeCount = incomeTransactions.length;
+	const expenseCount = expenseTransactions.length;
+
+	const incomeSum =
+		incomeTransactions.reduce((sum, t) => sum + t.amount, 0) || 0;
+	const positiveExpenseSum =
+		expenseTransactions
+			.filter((t) => t.amount >= 0)
 			.reduce((sum, t) => sum + t.amount, 0) || 0;
+	const negativeExpenseSum =
+		expenseTransactions
+			.filter((t) => t.amount < 0)
+			.reduce((sum, t) => sum + t.amount, 0) || 0;
+	const expenseSum = positiveExpenseSum + negativeExpenseSum;
 
 	return (
 		<div className="flex flex-col p-10 max-w-7xl mx-auto">
@@ -239,7 +255,7 @@ function RouteComponent() {
 				<Card>
 					<CardHeader className="pb-2">
 						<CardDescription>Total Transactions</CardDescription>
-						<CardTitle className="text-3xl">{totalTransactions}</CardTitle>
+						<CardTitle className="text-3xl">{transactionCount}</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-xs text-muted-foreground">
@@ -252,7 +268,7 @@ function RouteComponent() {
 					<CardHeader className="pb-2">
 						<CardDescription>Total Income</CardDescription>
 						<CardTitle className="text-3xl text-green-600">
-							${totalIncome.toFixed(2)}
+							{formatDollars(incomeSum)}
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
@@ -265,13 +281,19 @@ function RouteComponent() {
 				<Card>
 					<CardHeader className="pb-2">
 						<CardDescription>Total Spending</CardDescription>
-						<CardTitle className="text-3xl text-red-600">
-							${totalSpending.toFixed(2)}
+						<CardTitle
+							className={`text-3xl ${
+								expenseSum >= 0 ? "text-green-600" : "text-red-600"
+							}`}
+						>
+							{formatDollars(expenseSum)}
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-xs text-muted-foreground">
 							From {expenseCount} transaction{expenseCount !== 1 ? "s" : ""}
+							{positiveExpenseSum > 0 &&
+								` (including ${formatDollars(positiveExpenseSum, true, false)} in refunds)`}
 						</p>
 					</CardContent>
 				</Card>
@@ -281,17 +303,15 @@ function RouteComponent() {
 						<CardDescription>Net Balance</CardDescription>
 						<CardTitle
 							className={`text-3xl ${
-								totalIncome - totalSpending >= 0
-									? "text-green-600"
-									: "text-red-600"
+								incomeSum + expenseSum >= 0 ? "text-green-600" : "text-red-600"
 							}`}
 						>
-							${(totalIncome - totalSpending).toFixed(2)}
+							{formatDollars(incomeSum + expenseSum)}
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-xs text-muted-foreground">
-							{totalIncome - totalSpending >= 0 ? "Surplus" : "Deficit"}
+							{incomeSum + expenseSum > 0 ? "Surplus" : "Deficit"}
 						</p>
 					</CardContent>
 				</Card>
@@ -368,7 +388,7 @@ function RouteComponent() {
 								<CardHeader className="items-center pb-0">
 									<CardTitle>Spending by Category</CardTitle>
 									<CardDescription>
-										Total expenses: ${totalSpending.toFixed(2)}
+										Total spending: {formatDollars(expenseSum)}
 									</CardDescription>
 								</CardHeader>
 								<CardContent className="flex-1 pb-0">
@@ -441,7 +461,7 @@ function RouteComponent() {
 																	</span>
 																</div>
 																<span className="text-sm font-medium">
-																	${item.amount.toFixed(2)}
+																	{formatDollars(item.amount)}
 																</span>
 															</div>
 															<div className="flex items-center gap-2">
@@ -463,7 +483,8 @@ function RouteComponent() {
 														</div>
 													</TooltipTrigger>
 													<TooltipContent side="top" align="end">
-														Budgeted: ${item.category.budgetedAmount.toFixed(2)}
+														Budgeted:{" "}
+														{formatDollars(item.category.budgetedAmount)}
 													</TooltipContent>
 												</Tooltip>
 											);

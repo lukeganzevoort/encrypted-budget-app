@@ -44,3 +44,26 @@ export async function generateTransactionHash(
 	const data = `${rawDate}|${rawDescription}|${rawAmount}`;
 	return generateHash(data);
 }
+
+/**
+ * Formats a number as a dollar amount with 2 decimal places and comma separators
+ * If negative, places the minus sign before the dollar sign (e.g., -$10,000.00)
+ * @param amount - The amount to format
+ * @returns Formatted string (e.g., "$1,000.00" or "-$1,000.00")
+ */
+export function formatDollars(
+	amount: number,
+	includeSign: boolean = true,
+	includeDecimal: boolean = true,
+): string {
+	const absAmount = Math.abs(amount);
+	const formatted = absAmount.toLocaleString("en-US", {
+		minimumFractionDigits: includeDecimal ? 2 : 0,
+		maximumFractionDigits: includeDecimal ? 2 : 0,
+	});
+	return includeSign
+		? amount < 0
+			? `-$${formatted}`
+			: `$${formatted}`
+		: formatted;
+}

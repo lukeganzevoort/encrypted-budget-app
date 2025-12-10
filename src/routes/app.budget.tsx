@@ -1,29 +1,26 @@
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import {
+	and,
+	gt,
+	isUndefined,
+	lte,
+	or,
+	useLiveQuery,
+} from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { IconColorPicker } from "@/components/IconColorPicker";
 import { MonthYearSelector } from "@/components/MonthYearSelector";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
+	type IncomeCategory,
+	incomeCategoriesCollection,
 } from "@/db-collections/index";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
-import {
-	DEFAULT_CATEGORIES,
-	getIncomeCategoryIdForMonth,
-} from "@/lib/initialization";
 import { generateHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/budget")({
@@ -38,23 +35,16 @@ function RouteComponent() {
 	const [newCategoryIcon, setNewCategoryIcon] = useState<string>(DEFAULT_ICON);
 	const [newCategoryColor, setNewCategoryColor] =
 		useState<string>(DEFAULT_COLOR);
-	const [categories, setCategories] = useState<BudgetCategory[]>([]);
 	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 	const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
 		null,
 	);
 	const [editingCategoryName, setEditingCategoryName] = useState<string>("");
-	const [showCopyDialog, setShowCopyDialog] = useState(false);
-	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-	const [copySource, setCopySource] = useState<
-		"current" | "last" | "default" | null
-	>(null);
 
 	// Get current year and month
 	const now = new Date();
 	const currentYear = now.getFullYear();
 	const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
-	const currentMonthKey = `${currentYear}-${currentMonth}`;
 
 	// State for selected year and month, defaulting to current
 	const [selectedYear, setSelectedYear] = useState<string>(
@@ -65,77 +55,53 @@ function RouteComponent() {
 	// Combine year and month for query (format: "YYYY-MM")
 	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
 
-	// Query budget categories from the database, filtered by selected month
-	const { data: budgetCategories } = useLiveQuery(
+	// Query all budget categories and filter client-side for active ones
+	// This is necessary because we need to check both startMonth <= selectedMonth
+	// and (endMonth >= selectedMonth OR endMonth is null)
+	const { data: allBudgetCategories } = useLiveQuery(
 		(q) =>
 			q
 				.from({ category: budgetCategoriesCollection })
-				.where(({ category }) => eq(category.month, selectedMonthKey))
+				.where(({ category }) =>
+					and(
+						lte(category.startMonth, selectedMonthKey),
+						or(
+							isUndefined(category.endMonth),
+							gt(category.endMonth, selectedMonthKey),
+						),
+					),
+				)
 				.select(({ category }) => ({
 					...category,
 				})),
 		[selectedYear, selectedMonth],
 	);
 
-	// Query budget categories from current month
-	const { data: currentMonthCategories } = useLiveQuery(
+	const { data: incomeCategory } = useLiveQuery(
 		(q) =>
 			q
-				.from({ category: budgetCategoriesCollection })
-				.where(({ category }) => eq(category.month, currentMonthKey))
-				.select(({ category }) => ({
-					...category,
-				})),
-		[],
-	);
-
-	// Calculate last month key
-	const getLastMonthKey = (): string => {
-		const date = new Date(
-			Number.parseInt(selectedYear),
-			Number.parseInt(selectedMonth) - 1,
-		);
-		date.setMonth(date.getMonth() - 1);
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, "0");
-		return `${year}-${month}`;
-	};
-
-	const lastMonthKey = getLastMonthKey();
-
-	// Query budget categories from last month
-	const { data: lastMonthCategories } = useLiveQuery(
-		(q) =>
-			q
-				.from({ category: budgetCategoriesCollection })
-				.where(({ category }) => eq(category.month, lastMonthKey))
-				.select(({ category }) => ({
-					...category,
-				})),
+				.from({ category: incomeCategoriesCollection })
+				.orderBy(({ category }) => category.startMonth, "desc")
+				.where(({ category }) => lte(category.startMonth, selectedMonthKey))
+				.findOne(),
 		[selectedYear, selectedMonth],
 	);
 
-	// Get income category ID for current month
-	const incomeCategoryId = getIncomeCategoryIdForMonth(selectedMonthKey);
+	console.log("incomeCategory", incomeCategory);
+	console.log("selectedMonthKey", selectedMonthKey);
 
 	// Initialize income from Income category
+	// Use allBudgetCategories directly to avoid dependency on filtered array
 	useEffect(() => {
-		const incomeCategory = budgetCategories?.find(
-			(category) => category.id === incomeCategoryId,
-		);
 		if (incomeCategory) {
 			setMonthlyIncome(incomeCategory.budgetedAmount.toString());
 		} else {
 			setMonthlyIncome("");
 		}
-	}, [budgetCategories, incomeCategoryId]);
+	}, [incomeCategory]);
 
-	// Update local categories state when database changes
-	useEffect(() => {
-		if (budgetCategories) {
-			setCategories(budgetCategories);
-		}
-	}, [budgetCategories]);
+	// Use budgetCategories directly instead of maintaining separate state
+	const categories = allBudgetCategories ?? [];
 
 	const handleSaveIncome = async () => {
 		const income = Number.parseFloat(monthlyIncome);
@@ -144,27 +110,19 @@ function RouteComponent() {
 			return;
 		}
 
-		const incomeCategory = budgetCategories?.find(
-			(category) => category.id === incomeCategoryId,
-		);
-
-		if (incomeCategory) {
+		if (incomeCategory && incomeCategory.startMonth === selectedMonthKey) {
 			// Update existing Income category
-			budgetCategoriesCollection.update(incomeCategoryId, (item) => {
+			incomeCategoriesCollection.update(incomeCategory.id, (item) => {
 				item.budgetedAmount = income;
 			});
 		} else {
 			// Create Income category if it doesn't exist
-			const newIncomeCategory: BudgetCategory = {
-				id: incomeCategoryId,
-				name: "Income",
+			const newIncomeCategory: IncomeCategory = {
+				id: crypto.randomUUID(),
 				budgetedAmount: income,
-				order: 0,
-				icon: "DollarSign",
-				color: "#10b981",
-				month: selectedMonthKey,
+				startMonth: selectedMonthKey,
 			};
-			budgetCategoriesCollection.insert(newIncomeCategory);
+			incomeCategoriesCollection.insert(newIncomeCategory);
 		}
 	};
 
@@ -191,7 +149,7 @@ function RouteComponent() {
 			order,
 			icon: newCategoryIcon,
 			color: newCategoryColor,
-			month: selectedMonthKey,
+			startMonth: selectedMonthKey,
 		};
 
 		budgetCategoriesCollection.insert(category);
@@ -202,30 +160,105 @@ function RouteComponent() {
 	};
 
 	const handleDeleteCategory = (categoryId: string) => {
-		budgetCategoriesCollection.delete(categoryId);
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) {
+			alert("Category not found");
+			return;
+		}
+
+		if (category.startMonth === selectedMonthKey) {
+			budgetCategoriesCollection.delete(categoryId);
+		} else {
+			budgetCategoriesCollection.update(categoryId, (item) => {
+				item.endMonth = selectedMonthKey;
+			});
+		}
 	};
 
-	const handleUpdateCategory = (categoryId: string, newAmount: string) => {
+	const handleUpdateCategory = async (
+		categoryId: string,
+		newAmount: string,
+	) => {
 		const amount = Number.parseFloat(newAmount);
 		if (Number.isNaN(amount) || amount < 0) {
 			return;
 		}
 
-		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.budgetedAmount = amount;
-		});
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) {
+			return;
+		}
+
+		// If editing in the start month, update directly
+		if (category.startMonth === selectedMonthKey) {
+			budgetCategoriesCollection.update(categoryId, (item) => {
+				item.budgetedAmount = amount;
+			});
+		} else {
+			// Editing in a different month - need to split the category
+			await splitCategoryForEdit(category, { budgetedAmount: amount });
+		}
 	};
 
-	const handleUpdateIcon = (categoryId: string, icon: string) => {
-		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.icon = icon;
-		});
+	const handleUpdateIcon = async (categoryId: string, icon: string) => {
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) {
+			return;
+		}
+
+		// If editing in the start month, update directly
+		if (category.startMonth === selectedMonthKey) {
+			budgetCategoriesCollection.update(categoryId, (item) => {
+				item.icon = icon;
+			});
+		} else {
+			// Editing in a different month - need to split the category
+			await splitCategoryForEdit(category, { icon });
+		}
 	};
 
-	const handleUpdateColor = (categoryId: string, color: string) => {
-		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.color = color;
+	const handleUpdateColor = async (categoryId: string, color: string) => {
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) {
+			return;
+		}
+
+		// If editing in the start month, update directly
+		if (category.startMonth === selectedMonthKey) {
+			budgetCategoriesCollection.update(categoryId, (item) => {
+				item.color = color;
+			});
+		} else {
+			// Editing in a different month - need to split the category
+			await splitCategoryForEdit(category, { color });
+		}
+	};
+
+	/**
+	 * Split a category when editing in a non-start month
+	 * Sets the old category's endMonth to the previous month and creates a new category
+	 */
+	const splitCategoryForEdit = async (
+		category: BudgetCategory,
+		updates: Partial<BudgetCategory>,
+	) => {
+		// Update the old category to end at the previous month
+		budgetCategoriesCollection.update(category.id, (item) => {
+			item.endMonth = selectedMonthKey;
 		});
+
+		// Create a new category starting from the selected month
+		const newId = await generateHash(
+			`${category.name}-${Date.now()}-${Math.random()}`,
+		);
+		const newCategory: BudgetCategory = {
+			...category,
+			...updates,
+			id: newId,
+			startMonth: selectedMonthKey,
+		};
+
+		budgetCategoriesCollection.insert(newCategory);
 	};
 
 	const handleStartEditingName = (categoryId: string, currentName: string) => {
@@ -233,15 +266,29 @@ function RouteComponent() {
 		setEditingCategoryName(currentName);
 	};
 
-	const handleSaveCategoryName = (categoryId: string) => {
+	const handleSaveCategoryName = async (categoryId: string) => {
 		if (!editingCategoryName.trim()) {
 			alert("Category name cannot be empty");
 			return;
 		}
 
-		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.name = editingCategoryName.trim();
-		});
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) {
+			return;
+		}
+
+		// If editing in the start month, update directly
+		if (category.startMonth === selectedMonthKey) {
+			budgetCategoriesCollection.update(categoryId, (item) => {
+				item.name = editingCategoryName.trim();
+			});
+		} else {
+			// Editing in a different month - need to split the category
+			await splitCategoryForEdit(category, {
+				name: editingCategoryName.trim(),
+			});
+		}
+
 		setEditingCategoryId(null);
 		setEditingCategoryName("");
 	};
@@ -251,138 +298,13 @@ function RouteComponent() {
 		setEditingCategoryName("");
 	};
 
-	// Check if there are existing categories (excluding income)
-	const hasExistingCategories = () => {
-		return categories.filter((cat) => cat.id !== incomeCategoryId).length > 0;
-	};
-
-	// Get available copy sources
-	const getAvailableCopySources = () => {
-		const sources: Array<{
-			value: "current" | "last" | "default";
-			label: string;
-		}> = [];
-
-		// Add current month option if selected month is not current month and there are categories
-		if (selectedMonthKey !== currentMonthKey) {
-			const currentMonthNonIncomeCategories =
-				currentMonthCategories?.filter(
-					(cat) => cat.id !== getIncomeCategoryIdForMonth(currentMonthKey),
-				) ?? [];
-			if (currentMonthNonIncomeCategories.length > 0) {
-				sources.push({
-					value: "current",
-					label: `Default (${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })})`,
-				});
-			}
-		}
-
-		// Add last month option if there are categories for last month
-		const lastMonthNonIncomeCategories =
-			lastMonthCategories?.filter(
-				(cat) => cat.id !== getIncomeCategoryIdForMonth(lastMonthKey),
-			) ?? [];
-		if (lastMonthNonIncomeCategories.length > 0) {
-			sources.push({
-				value: "last",
-				label: `Last Month (${new Date(lastMonthKey).toLocaleDateString("en-US", { month: "long", year: "numeric" })})`,
-			});
-		}
-
-		// Always add default categories option
-		if (sources.length === 0) {
-			sources.push({ value: "default", label: "Default Categories" });
-		}
-
-		return sources;
-	};
-
-	const handleCopyBudget = async (source: "current" | "last" | "default") => {
-		// Check if there are existing categories
-		if (hasExistingCategories()) {
-			setCopySource(source);
-			setShowConfirmDialog(true);
-			setShowCopyDialog(false);
-			return;
-		}
-
-		// Proceed with copy if no existing categories
-		await performCopy(source);
-		setShowCopyDialog(false);
-	};
-
-	const performCopy = async (source: "current" | "last" | "default") => {
-		let categoriesToCopy: Omit<BudgetCategory, "id" | "month">[] = [];
-
-		if (source === "current") {
-			// Copy from current month (excluding income)
-			categoriesToCopy =
-				currentMonthCategories.map((cat) => ({
-					name: cat.name,
-					budgetedAmount: cat.budgetedAmount,
-					order: cat.order,
-					icon: cat.icon,
-					color: cat.color,
-				})) ?? [];
-		} else if (source === "last") {
-			// Copy from last month (excluding income)
-			categoriesToCopy =
-				lastMonthCategories.map((cat) => ({
-					name: cat.name,
-					budgetedAmount: cat.budgetedAmount,
-					order: cat.order,
-					icon: cat.icon,
-					color: cat.color,
-				})) ?? [];
-		} else {
-			// Copy from default categories
-			categoriesToCopy = DEFAULT_CATEGORIES.map((cat, index) => ({
-				name: cat.name,
-				budgetedAmount: cat.amount,
-				order: index,
-				icon: cat.icon,
-				color: cat.color,
-			}));
-		}
-
-		// Delete existing categories (excluding income)
-		const categoriesToDelete = categories;
-		for (const category of categoriesToDelete) {
-			budgetCategoriesCollection.delete(category.id);
-		}
-
-		// Insert new categories
-		for (const categoryData of categoriesToCopy) {
-			const id =
-				categoryData.name === "Income"
-					? incomeCategoryId
-					: await generateHash(
-							`${categoryData.name}-${Date.now()}-${Math.random()}`,
-						);
-			const category: BudgetCategory = {
-				id,
-				...categoryData,
-				month: selectedMonthKey,
-			};
-			budgetCategoriesCollection.insert(category);
-		}
-	};
-
-	const handleConfirmCopy = async () => {
-		if (copySource) {
-			await performCopy(copySource);
-			setShowConfirmDialog(false);
-			setCopySource(null);
-		}
-	};
-
 	// Calculate totals
-	const incomeCategory = categories.find((cat) => cat.id === incomeCategoryId);
 	const currentIncome = incomeCategory?.budgetedAmount || 0;
 	// Exclude Income category from total budgeted (only count expenses)
-	const totalBudgeted = categories
-		.filter((cat) => cat.id !== incomeCategoryId)
-		.reduce((sum, cat) => sum + cat.budgetedAmount, 0);
+	const totalBudgeted = categories.reduce(
+		(sum, cat) => sum + cat.budgetedAmount,
+		0,
+	);
 	const remainingBalance = currentIncome - totalBudgeted;
 
 	// Sort categories by order
@@ -392,22 +314,12 @@ function RouteComponent() {
 		<div className="flex flex-col p-10 max-w-4xl mx-auto">
 			<div className="flex items-center justify-between mb-8">
 				<h1 className="text-3xl font-bold">Budget</h1>
-				<div className="flex items-center gap-4">
-					<Button
-						variant="outline"
-						onClick={() => setShowCopyDialog(true)}
-						className="flex items-center gap-2"
-					>
-						<Copy size={16} />
-						Copy Budget
-					</Button>
-					<MonthYearSelector
-						selectedYear={selectedYear}
-						selectedMonth={selectedMonth}
-						onYearChange={setSelectedYear}
-						onMonthChange={setSelectedMonth}
-					/>
-				</div>
+				<MonthYearSelector
+					selectedYear={selectedYear}
+					selectedMonth={selectedMonth}
+					onYearChange={setSelectedYear}
+					onMonthChange={setSelectedMonth}
+				/>
 			</div>
 
 			{/* Budget Summary */}
@@ -470,81 +382,75 @@ function RouteComponent() {
 				{/* Categories List */}
 				{sortedCategories.length > 0 ? (
 					<div className="space-y-2 mb-6">
-						{sortedCategories
-							.filter((category) => category.id !== incomeCategoryId)
-							.map((category) => {
-								return (
-									<div
-										key={category.id}
-										className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-									>
-										<IconColorPicker
-											icon={category.icon || DEFAULT_ICON}
-											color={category.color || DEFAULT_COLOR}
-											onIconChange={(icon) =>
-												handleUpdateIcon(category.id, icon)
-											}
-											onColorChange={(color) =>
-												handleUpdateColor(category.id, color)
-											}
-											open={openPopoverId === category.id}
-											onOpenChange={(open) =>
-												setOpenPopoverId(open ? category.id : null)
-											}
-											triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
-										/>
-										<div className="flex-1">
-											{editingCategoryId === category.id ? (
-												<Input
-													type="text"
-													value={editingCategoryName}
-													onChange={(e) =>
-														setEditingCategoryName(e.target.value)
-													}
-													onBlur={() => handleSaveCategoryName(category.id)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") {
-															handleSaveCategoryName(category.id);
-														} else if (e.key === "Escape") {
-															handleCancelEditingName();
-														}
-													}}
-													autoFocus
-													className="font-medium"
-												/>
-											) : (
-												<button
-													type="button"
-													className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
-													onClick={() =>
-														handleStartEditingName(category.id, category.name)
-													}
-												>
-													{category.name}
-												</button>
-											)}
-										</div>
-										<div className="w-40">
+						{sortedCategories.map((category) => {
+							return (
+								<div
+									key={category.id}
+									className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+								>
+									<IconColorPicker
+										icon={category.icon || DEFAULT_ICON}
+										color={category.color || DEFAULT_COLOR}
+										onIconChange={(icon) => handleUpdateIcon(category.id, icon)}
+										onColorChange={(color) =>
+											handleUpdateColor(category.id, color)
+										}
+										open={openPopoverId === category.id}
+										onOpenChange={(open) =>
+											setOpenPopoverId(open ? category.id : null)
+										}
+										triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
+									/>
+									<div className="flex-1">
+										{editingCategoryId === category.id ? (
 											<Input
-												type="number"
-												value={category.budgetedAmount}
-												onChange={(e) =>
-													handleUpdateCategory(category.id, e.target.value)
-												}
-												className="text-right"
+												type="text"
+												value={editingCategoryName}
+												onChange={(e) => setEditingCategoryName(e.target.value)}
+												onBlur={() => handleSaveCategoryName(category.id)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														handleSaveCategoryName(category.id);
+													} else if (e.key === "Escape") {
+														handleCancelEditingName();
+													}
+												}}
+												autoFocus
+												className="font-medium"
 											/>
-										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => handleDeleteCategory(category.id)}
-											className="flex items-center gap-1 hover:text-red-500"
-										>
-											<Trash2 size={16} />
-										</Button>
+										) : (
+											<button
+												type="button"
+												className={`font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full`}
+												onClick={() =>
+													handleStartEditingName(category.id, category.name)
+												}
+											>
+												{category.name}
+											</button>
+										)}
 									</div>
-								);
-							})}
+									<div className="w-40">
+										<Input
+											type="number"
+											value={category.budgetedAmount}
+											onChange={(e) =>
+												handleUpdateCategory(category.id, e.target.value)
+											}
+											className="text-right"
+										/>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => handleDeleteCategory(category.id)}
+										className="flex items-center gap-1 hover:text-red-500"
+									>
+										<Trash2 size={16} />
+									</Button>
+								</div>
+							);
+						})}
 					</div>
 				) : (
 					<div className="text-center py-8 text-gray-500">
@@ -603,63 +509,6 @@ function RouteComponent() {
 					</div>
 				</div>
 			</div>
-
-			{/* Copy Budget Dialog */}
-			<Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Copy Budget Categories</DialogTitle>
-						<DialogDescription>
-							Select a source to copy budget categories from:
-						</DialogDescription>
-					</DialogHeader>
-					<div className="py-4 space-y-2">
-						{getAvailableCopySources().map((source) => (
-							<Button
-								key={source.value}
-								variant="outline"
-								className="w-full justify-start"
-								onClick={() => handleCopyBudget(source.value)}
-							>
-								{source.label}
-							</Button>
-						))}
-					</div>
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setShowCopyDialog(false)}>
-							Cancel
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Confirmation Dialog */}
-			<Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Confirm Copy Budget</DialogTitle>
-						<DialogDescription>
-							This will delete all existing budget categories for this month and
-							replace them with the selected source. This action cannot be
-							undone.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => {
-								setShowConfirmDialog(false);
-								setCopySource(null);
-							}}
-						>
-							Cancel
-						</Button>
-						<Button variant="destructive" onClick={handleConfirmCopy}>
-							Confirm
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

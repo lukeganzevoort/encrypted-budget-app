@@ -6,6 +6,7 @@ import {
 	Coffee,
 	CreditCard,
 	Dog,
+	DollarSign,
 	Dumbbell,
 	Film,
 	Gift,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 
 export const AVAILABLE_ICONS: Record<string, LucideIcon> = {
+	DollarSign,
 	Heart,
 	PiggyBank,
 	ShoppingCart,

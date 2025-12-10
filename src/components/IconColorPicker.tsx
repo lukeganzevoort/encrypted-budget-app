@@ -15,6 +15,7 @@ interface IconColorPickerProps {
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 	triggerClassName?: string;
+	disabled?: boolean;
 }
 
 export function IconColorPicker({
@@ -25,13 +26,18 @@ export function IconColorPicker({
 	open,
 	onOpenChange,
 	triggerClassName,
+	disabled = false,
 }: IconColorPickerProps) {
 	return (
-		<Popover open={open} onOpenChange={onOpenChange}>
+		<Popover
+			open={open && !disabled}
+			onOpenChange={disabled ? undefined : onOpenChange}
+		>
 			<PopoverTrigger asChild>
 				<Button
 					variant="ghost"
 					className={triggerClassName || "h-12 w-12 p-0 m-0 rounded-full"}
+					disabled={disabled}
 				>
 					<CategoryIcon
 						icon={icon}

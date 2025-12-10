@@ -47,6 +47,23 @@ export const transactionsCollection = createCollection(
 	}),
 );
 
+const IncomeCategorySchema = z.object({
+	id: z.string(),
+	budgetedAmount: z.number(), // Positive number
+	startMonth: z.string(), // Format: "YYYY-MM"
+});
+
+export type IncomeCategory = z.infer<typeof IncomeCategorySchema>;
+
+export const incomeCategoriesCollection = createCollection(
+	localStorageCollectionOptions({
+		id: "income-categories",
+		storageKey: "income-categories",
+		getKey: (category) => category.id,
+		schema: IncomeCategorySchema,
+	}),
+);
+
 const BudgetCategorySchema = z.object({
 	id: z.string(),
 	name: z.string(),
@@ -54,7 +71,8 @@ const BudgetCategorySchema = z.object({
 	order: z.number(),
 	icon: z.string().optional(),
 	color: z.string().optional(),
-	month: z.string(), // Format: "YYYY-MM"
+	startMonth: z.string(), // Format: "YYYY-MM"
+	endMonth: z.string().optional(), // Format: "YYYY-MM"
 });
 
 export type BudgetCategory = z.infer<typeof BudgetCategorySchema>;

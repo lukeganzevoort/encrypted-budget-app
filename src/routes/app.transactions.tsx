@@ -24,11 +24,13 @@ import {
 } from "@/components/ui/select";
 import {
 	accountsCollection,
+	BudgetCategory,
 	budgetCategoriesCollection,
 	type Transaction,
 	type TransactionSplit,
 	transactionsCollection,
 } from "@/db-collections/index";
+import { INCOME_CATEGORY_ID } from "@/lib/initialization";
 import { generateTransactionHash } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/transactions")({
@@ -322,10 +324,25 @@ function RouteComponent() {
 		return splits.reduce((sum, split) => sum + split.amount, 0);
 	};
 
-	// Sort categories by name for the dropdown
+	// Sort categories by name for the dropdown and add "income" category at the beginning
 	const sortedCategories = budgetCategories
-		? [...budgetCategories].sort((a, b) => a.name.localeCompare(b.name))
-		: [];
+		? [
+				{
+					id: INCOME_CATEGORY_ID,
+					name: "Income",
+					icon: "DollarSign",
+					color: "#10b981",
+				},
+				...[...budgetCategories].sort((a, b) => a.name.localeCompare(b.name)),
+			]
+		: [
+				{
+					id: INCOME_CATEGORY_ID,
+					name: "Income",
+					icon: "DollarSign",
+					color: "#10b981",
+				},
+			];
 
 	// Sort accounts by name for the dropdown
 	const sortedAccounts = accounts
