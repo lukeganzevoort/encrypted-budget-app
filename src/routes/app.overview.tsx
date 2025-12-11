@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { MonthYearSelector } from "@/components/MonthYearSelector";
+import { Badge } from "@/components/ui/badge";
 import {
 	Card,
 	CardContent,
@@ -439,9 +440,8 @@ function RouteComponent() {
 											const percentage =
 												budgetedAmount > 0
 													? (item.amount / budgetedAmount) * 100
-													: item.amount > 0
-														? 100
-														: 0;
+													: (item.amount / 0.001) * 100;
+											const isOverspent = item.amount > budgetedAmount;
 											return (
 												<Tooltip key={item.categoryId}>
 													<TooltipTrigger asChild>
@@ -456,8 +456,20 @@ function RouteComponent() {
 																	<span className="font-medium">
 																		{item.category.name}
 																	</span>
+																	{isOverspent && (
+																		<Badge
+																			variant="destructive"
+																			className="text-xs"
+																		>
+																			OVER SPENT
+																		</Badge>
+																	)}
 																</div>
-																<span className="text-sm font-medium">
+																<span
+																	className={`text-sm font-medium ${
+																		isOverspent ? "text-red-600" : ""
+																	}`}
+																>
 																	{formatDollars(item.amount)}
 																</span>
 															</div>
@@ -471,16 +483,28 @@ function RouteComponent() {
 																		}}
 																	/>
 																</div>
-																<span className="text-xs text-muted-foreground w-12 text-right">
-																	{budgetedAmount > 0
-																		? `${percentage.toFixed(1)}%`
-																		: "—"}
+																<span
+																	className={`text-xs w-12 text-right ${
+																		isOverspent
+																			? "text-red-600 font-semibold"
+																			: "text-muted-foreground"
+																	}`}
+																>
+																	{`${isOverspent ? ">100" : Math.min(percentage, 100).toFixed(0)}%`}
 																</span>
 															</div>
 														</div>
 													</TooltipTrigger>
 													<TooltipContent side="top" align="end">
-														Budgeted: {formatDollars(budgetedAmount)}
+														<div>
+															Budgeted: {formatDollars(budgetedAmount)}
+															{isOverspent && (
+																<div className="text-red-600 font-semibold mt-1">
+																	Over by:{" "}
+																	{formatDollars(item.amount - budgetedAmount)}
+																</div>
+															)}
+														</div>
 													</TooltipContent>
 												</Tooltip>
 											);
