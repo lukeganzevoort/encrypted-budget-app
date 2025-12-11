@@ -1,6 +1,5 @@
 import {
 	and,
-	gt,
 	gte,
 	isUndefined,
 	lte,
@@ -8,7 +7,14 @@ import {
 	useLiveQuery,
 } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
+import {
+	IterationCw,
+	MoveDiagonal,
+	MoveRight,
+	Plus,
+	Settings,
+	Trash2,
+} from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { IconColorPicker } from "@/components/IconColorPicker";
 import { MonthYearSelector } from "@/components/MonthYearSelector";
@@ -16,12 +22,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	Sheet,
+	SheetBody,
+	SheetContent,
+	SheetFooter,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
 	getBudgetedAmountForMonth,
+	getRolloverConfigForMonth,
 	type IncomeCategory,
 	incomeCategoriesCollection,
-	isCategoryActiveForMonth,
+	type RolloverConfig,
 } from "@/db-collections/index";
 import { DEFAULT_COLOR, DEFAULT_ICON } from "@/lib/category-icons";
 import { getPreviousMonth } from "@/lib/utils";
@@ -39,10 +63,19 @@ function RouteComponent() {
 	const [newCategoryColor, setNewCategoryColor] =
 		useState<string>(DEFAULT_COLOR);
 	const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
-	const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
-		null,
-	);
-	const [editingCategoryName, setEditingCategoryName] = useState<string>("");
+	const [rolloverSheetId, setRolloverSheetId] = useState<string | null>(null);
+	const [focusField, setFocusField] = useState<
+		"name" | "description" | "amount" | "rolloverType" | null
+	>(null);
+	const [rolloverType, setRolloverType] = useState<
+		"rollover" | "transfer" | "conditional"
+	>("rollover");
+	const [rolloverTargetCategoryId, setRolloverTargetCategoryId] =
+		useState<string>("");
+	const [rolloverMaxAmount, setRolloverMaxAmount] = useState<string>("");
+	const [editingAmount, setEditingAmount] = useState<string>("");
+	const [editingDescription, setEditingDescription] = useState<string>("");
+	const [editingName, setEditingName] = useState<string>("");
 
 	// Get current year and month
 	const now = new Date();
@@ -141,6 +174,9 @@ function RouteComponent() {
 				{
 					budgetedAmount: amount,
 					startMonth: selectedMonthKey,
+					rolloverConfig: {
+						type: "rollover",
+					},
 				},
 			],
 		};
@@ -167,42 +203,6 @@ function RouteComponent() {
 		}
 	};
 
-	const handleUpdateCategory = async (
-		categoryId: string,
-		newAmount: string,
-	) => {
-		const amount = Number.parseFloat(newAmount);
-		if (Number.isNaN(amount) || amount < 0) {
-			return;
-		}
-
-		const category = categories.find((cat) => cat.id === categoryId);
-		if (!category) {
-			return;
-		}
-
-		// Find or create monthly budget entry for this month
-		budgetCategoriesCollection.update(categoryId, (item) => {
-			const existingIndex = item.monthlyBudgets.findIndex(
-				(mb) => mb.startMonth === selectedMonthKey,
-			);
-			if (existingIndex >= 0) {
-				// Update existing entry
-				item.monthlyBudgets[existingIndex].budgetedAmount = amount;
-			} else {
-				// Add new entry for this month
-				item.monthlyBudgets.push({
-					budgetedAmount: amount,
-					startMonth: selectedMonthKey,
-				});
-				// Sort by startMonth to keep them in order
-				item.monthlyBudgets.sort((a, b) =>
-					a.startMonth.localeCompare(b.startMonth),
-				);
-			}
-		});
-	};
-
 	const handleUpdateIcon = async (categoryId: string, icon: string) => {
 		// Icon is shared across all months, so update directly
 		budgetCategoriesCollection.update(categoryId, (item) => {
@@ -217,29 +217,142 @@ function RouteComponent() {
 		});
 	};
 
-	const handleStartEditingName = (categoryId: string, currentName: string) => {
-		setEditingCategoryId(categoryId);
-		setEditingCategoryName(currentName);
+	const getRolloverIcon = (
+		type: "rollover" | "transfer" | "conditional",
+		size: number = 16,
+	) => {
+		switch (type) {
+			case "rollover":
+				return <IterationCw size={size} />;
+			case "transfer":
+				return <MoveRight size={size} />;
+			case "conditional":
+				return <MoveDiagonal size={size} />;
+		}
 	};
 
-	const handleSaveCategoryName = async (categoryId: string) => {
-		if (!editingCategoryName.trim()) {
-			alert("Category name cannot be empty");
+	const getRolloverIconFromCategory = (category: BudgetCategory) => {
+		const config = getRolloverConfigForMonth(category, selectedMonthKey);
+		if (config) {
+			return getRolloverIcon(config.type);
+		}
+		return getRolloverIcon("rollover");
+	};
+
+	const handleOpenRolloverConfig = (
+		categoryId: string,
+		focusFieldName:
+			| "name"
+			| "description"
+			| "amount"
+			| "rolloverType"
+			| null = null,
+	) => {
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) return;
+
+		const amount = getBudgetedAmountForMonth(category, selectedMonthKey);
+		setEditingAmount(amount.toString());
+		setEditingDescription(category.description || "");
+		setEditingName(category.name);
+		setFocusField(focusFieldName);
+
+		const config = getRolloverConfigForMonth(category, selectedMonthKey);
+		if (config) {
+			setRolloverType(config.type);
+
+			if (config.type === "transfer" || config.type === "conditional") {
+				setRolloverTargetCategoryId(config.targetCategoryId);
+			} else {
+				setRolloverTargetCategoryId("");
+			}
+
+			if (config.type === "conditional") {
+				setRolloverMaxAmount(config.maxRolloverAmount.toString());
+			} else {
+				setRolloverMaxAmount("");
+			}
+		} else {
+			// Default to rollover to same category
+			setRolloverType("rollover");
+			setRolloverTargetCategoryId("");
+			setRolloverMaxAmount("");
+		}
+		setRolloverSheetId(categoryId);
+	};
+
+	const handleSaveRolloverConfig = async (categoryId: string) => {
+		const category = categories.find((cat) => cat.id === categoryId);
+		if (!category) return;
+
+		// Validate and parse amount
+		const amount = Number.parseFloat(editingAmount);
+		if (Number.isNaN(amount) || amount < 0) {
+			alert("Please enter a valid budget amount");
 			return;
 		}
 
-		// Name is shared across all months, so update directly
+		let rolloverConfig: RolloverConfig;
+
+		if (rolloverType === "rollover") {
+			rolloverConfig = {
+				type: "rollover",
+			};
+		} else {
+			if (!rolloverTargetCategoryId) {
+				alert("Please select a target category");
+				return;
+			}
+			if (rolloverType === "transfer") {
+				rolloverConfig = {
+					type: "transfer",
+					targetCategoryId: rolloverTargetCategoryId,
+				};
+			} else if (rolloverType === "conditional") {
+				const maxAmount = Number.parseFloat(rolloverMaxAmount.trim());
+				if (Number.isNaN(maxAmount) || maxAmount < 0) {
+					alert("Please enter a valid max rollover amount");
+					return;
+				}
+				rolloverConfig = {
+					type: "conditional",
+					targetCategoryId: rolloverTargetCategoryId,
+					maxRolloverAmount: Number.parseFloat(rolloverMaxAmount.trim()),
+				};
+			}
+		}
+
+		// Update category name and description
 		budgetCategoriesCollection.update(categoryId, (item) => {
-			item.name = editingCategoryName.trim();
+			item.name = editingName.trim();
+			item.description = editingDescription.trim() || undefined;
 		});
 
-		setEditingCategoryId(null);
-		setEditingCategoryName("");
-	};
+		// Find or create monthly budget entry for this month
+		budgetCategoriesCollection.update(categoryId, (item) => {
+			const existingIndex = item.monthlyBudgets.findIndex(
+				(mb) => mb.startMonth === selectedMonthKey,
+			);
+			if (existingIndex >= 0) {
+				// Update existing entry
+				item.monthlyBudgets[existingIndex].budgetedAmount = amount;
+				item.monthlyBudgets[existingIndex].rolloverConfig = rolloverConfig;
+			} else {
+				// Add new entry for this month
+				const newBudget = {
+					budgetedAmount: amount,
+					startMonth: selectedMonthKey,
+					rolloverConfig,
+				};
+				item.monthlyBudgets.push(newBudget);
+				// Sort by startMonth to keep them in order
+				item.monthlyBudgets.sort((a, b) =>
+					a.startMonth.localeCompare(b.startMonth),
+				);
+			}
+		});
 
-	const handleCancelEditingName = () => {
-		setEditingCategoryId(null);
-		setEditingCategoryName("");
+		setRolloverSheetId(null);
 	};
 
 	// Calculate totals
@@ -346,55 +459,259 @@ function RouteComponent() {
 										triggerClassName="h-12 w-12 p-0 m-0 rounded-full hover:bg-gray-200"
 									/>
 									<div className="flex-1">
-										{editingCategoryId === category.id ? (
-											<Input
-												type="text"
-												value={editingCategoryName}
-												onChange={(e) => setEditingCategoryName(e.target.value)}
-												onBlur={() => handleSaveCategoryName(category.id)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") {
-														handleSaveCategoryName(category.id);
-													} else if (e.key === "Escape") {
-														handleCancelEditingName();
-													}
-												}}
-												autoFocus
-												className="font-medium"
-											/>
-										) : (
+										<div
+											className={`flex flex-col ${
+												category.description
+													? "items-start"
+													: "items-start justify-center"
+											} min-h-[3rem]`}
+										>
 											<button
 												type="button"
-												className={`font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full`}
+												className="font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
 												onClick={() =>
-													handleStartEditingName(category.id, category.name)
+													handleOpenRolloverConfig(category.id, "name")
 												}
 											>
 												{category.name}
 											</button>
-										)}
-									</div>
-									<div className="w-40">
-										<Input
-											type="number"
-											value={getBudgetedAmountForMonth(
-												category,
-												selectedMonthKey,
+											{category.description && (
+												<button
+													type="button"
+													className="text-sm text-gray-500 mt-1 cursor-pointer hover:text-blue-600 transition-colors text-left w-full"
+													onClick={() =>
+														handleOpenRolloverConfig(category.id, "description")
+													}
+												>
+													{category.description}
+												</button>
 											)}
-											onChange={(e) =>
-												handleUpdateCategory(category.id, e.target.value)
-											}
-											className="text-right"
-										/>
+										</div>
 									</div>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => handleDeleteCategory(category)}
-										className="flex items-center gap-1 hover:text-red-500"
+									<button
+										type="button"
+										className="w-32 text-right font-medium cursor-pointer hover:text-blue-600 transition-colors"
+										onClick={() =>
+											handleOpenRolloverConfig(category.id, "amount")
+										}
 									>
-										<Trash2 size={16} />
+										$
+										{getBudgetedAmountForMonth(
+											category,
+											selectedMonthKey,
+										).toFixed(2)}
+									</button>
+									<Button
+										size="icon"
+										variant="ghost"
+										className="text-right font-medium cursor-pointer hover:text-blue-600 transition-colors"
+										onClick={() =>
+											handleOpenRolloverConfig(category.id, "rolloverType")
+										}
+									>
+										{getRolloverIconFromCategory(category)}
 									</Button>
+									<Sheet
+										open={rolloverSheetId === category.id}
+										onOpenChange={(open) => {
+											if (open) {
+												handleOpenRolloverConfig(category.id);
+											} else {
+												setRolloverSheetId(null);
+												setFocusField(null);
+											}
+										}}
+									>
+										<SheetTrigger asChild>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="flex items-center gap-1 hover:text-blue-500"
+											>
+												<Settings size={16} />
+											</Button>
+										</SheetTrigger>
+										<SheetContent>
+											<SheetHeader>
+												<SheetTitle>Edit Category</SheetTitle>
+											</SheetHeader>
+
+											<SheetBody>
+												<div className="space-y-6 p-4">
+													<div className="space-y-2">
+														<Label htmlFor={`name-${category.id}`}>
+															Category Name
+														</Label>
+														<Input
+															id={`name-${category.id}`}
+															type="text"
+															placeholder="Category name"
+															value={editingName}
+															onChange={(e) => setEditingName(e.target.value)}
+															autoFocus={focusField === "name"}
+														/>
+													</div>
+
+													<div className="space-y-2">
+														<Label htmlFor={`amount-${category.id}`}>
+															Budget Amount
+														</Label>
+														<Input
+															id={`amount-${category.id}`}
+															type="number"
+															placeholder="0.00"
+															value={editingAmount}
+															onChange={(e) => setEditingAmount(e.target.value)}
+															autoFocus={focusField === "amount"}
+														/>
+													</div>
+
+													<div className="space-y-2">
+														<Label htmlFor={`description-${category.id}`}>
+															Description
+														</Label>
+														<Textarea
+															id={`description-${category.id}`}
+															placeholder="Add a description for this category..."
+															value={editingDescription}
+															onChange={(e) =>
+																setEditingDescription(e.target.value)
+															}
+															rows={3}
+															autoFocus={focusField === "description"}
+														/>
+													</div>
+
+													<div className="space-y-2">
+														<Label htmlFor={`rollover-type-${category.id}`}>
+															What happens to extra money?
+														</Label>
+														<Select
+															value={rolloverType}
+															onValueChange={(value) => {
+																if (
+																	value === "rollover" ||
+																	value === "transfer" ||
+																	value === "conditional"
+																) {
+																	setRolloverType(value);
+																}
+															}}
+														>
+															<SelectTrigger
+																id={`rollover-type-${category.id}`}
+																className="w-full"
+																autoFocus={focusField === "rolloverType"}
+															>
+																<div className="flex items-center gap-2 flex-1">
+																	<SelectValue placeholder="Select option" />
+																</div>
+															</SelectTrigger>
+															<SelectContent>
+																<SelectItem value="rollover">
+																	<div className="flex items-center gap-2">
+																		{getRolloverIcon("rollover", 16)}
+																		<span>Roll over to same category</span>
+																	</div>
+																</SelectItem>
+																<SelectItem value="transfer">
+																	<div className="flex items-center gap-2">
+																		{getRolloverIcon("transfer", 16)}
+																		<span>Transfer to another category</span>
+																	</div>
+																</SelectItem>
+																<SelectItem value="conditional">
+																	<div className="flex items-center gap-2">
+																		{getRolloverIcon("conditional", 16)}
+																		<span>
+																			Rollover up to amount, then transfer
+																		</span>
+																	</div>
+																</SelectItem>
+															</SelectContent>
+														</Select>
+													</div>
+
+													{rolloverType === "conditional" && (
+														<div className="space-y-2">
+															<Label htmlFor={`rollover-max-${category.id}`}>
+																Max Rollover Amount
+															</Label>
+															<Input
+																id={`rollover-max-${category.id}`}
+																type="number"
+																placeholder="0.00"
+																value={rolloverMaxAmount}
+																onChange={(e) =>
+																	setRolloverMaxAmount(e.target.value)
+																}
+															/>
+															<p className="text-xs text-muted-foreground">
+																Amount above this will be transferred to the
+																target category
+															</p>
+														</div>
+													)}
+
+													{(rolloverType === "transfer" ||
+														rolloverType === "conditional") && (
+														<div className="space-y-2">
+															<Label htmlFor={`rollover-target-${category.id}`}>
+																Target Category
+															</Label>
+															<Select
+																value={rolloverTargetCategoryId}
+																onValueChange={setRolloverTargetCategoryId}
+															>
+																<SelectTrigger
+																	id={`rollover-target-${category.id}`}
+																>
+																	<SelectValue placeholder="Select category" />
+																</SelectTrigger>
+																<SelectContent>
+																	{sortedCategories
+																		.filter((cat) => cat.id !== category.id)
+																		.map((cat) => (
+																			<SelectItem key={cat.id} value={cat.id}>
+																				{cat.name}
+																			</SelectItem>
+																		))}
+																</SelectContent>
+															</Select>
+														</div>
+													)}
+												</div>
+											</SheetBody>
+											<SheetFooter className="flex-col sm:flex-row gap-2">
+												<Button
+													variant="destructive"
+													onClick={() => {
+														handleDeleteCategory(category);
+														setRolloverSheetId(null);
+													}}
+													className="flex items-center gap-2"
+												>
+													<Trash2 size={16} />
+													Delete
+												</Button>
+												<div className="flex gap-2 ml-auto">
+													<Button
+														variant="outline"
+														onClick={() => setRolloverSheetId(null)}
+													>
+														Cancel
+													</Button>
+													<Button
+														onClick={() =>
+															handleSaveRolloverConfig(category.id)
+														}
+													>
+														Save
+													</Button>
+												</div>
+											</SheetFooter>
+										</SheetContent>
+									</Sheet>
 								</div>
 							);
 						})}

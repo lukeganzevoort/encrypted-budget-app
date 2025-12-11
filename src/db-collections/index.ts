@@ -64,9 +64,43 @@ export const incomeCategoriesCollection = createCollection(
 	}),
 );
 
+/**
+ * RolloverConfigSchema explained:
+ *
+ * - type: "rollover"
+ *     - Just rolls over any leftover budget to the next month in the same category.
+ *     - No need for targetCategoryId or maxRolloverAmount.
+ *
+ * - type: "transfer"
+ *     - If money is left over, transfers the remainder to another category.
+ *     - Requires targetCategoryId (the category to transfer to).
+ *     - maxRolloverAmount is not used.
+ *
+ * - type: "conditional"
+ *     - Rolls over up to a maxRolloverAmount (if specified), and the rest (if any) transfers to targetCategoryId.
+ *     - Requires both targetCategoryId and maxRolloverAmount.
+ */
+const RolloverConfigSchema = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("rollover"),
+	}),
+	z.object({
+		type: z.literal("transfer"),
+		targetCategoryId: z.string(),
+	}),
+	z.object({
+		type: z.literal("conditional"),
+		targetCategoryId: z.string(),
+		maxRolloverAmount: z.number(),
+	}),
+]);
+
+export type RolloverConfig = z.infer<typeof RolloverConfigSchema>;
+
 const MonthlyBudgetSchema = z.object({
 	budgetedAmount: z.number(),
 	startMonth: z.string(), // Format: "YYYY-MM"
+	rolloverConfig: RolloverConfigSchema.optional(),
 });
 
 export type MonthlyBudget = z.infer<typeof MonthlyBudgetSchema>;
@@ -74,6 +108,7 @@ export type MonthlyBudget = z.infer<typeof MonthlyBudgetSchema>;
 const BudgetCategorySchema = z.object({
 	id: z.string(),
 	name: z.string(),
+	description: z.string().optional(),
 	order: z.number(),
 	icon: z.string().optional(),
 	color: z.string().optional(),
@@ -107,6 +142,30 @@ export function getBudgetedAmountForMonth(
 
 	// Return the most recent budget (the one with the latest startMonth that applies)
 	return relevantBudgets[0].budgetedAmount;
+}
+
+/**
+ * Gets the rollover configuration for a specific month from a category
+ * Returns undefined if no rollover config exists for that month
+ */
+export function getRolloverConfigForMonth(
+	category: BudgetCategory,
+	month: string,
+): RolloverConfig | undefined {
+	if (category.endMonth && category.endMonth < month) {
+		return undefined;
+	}
+	// Find the most recent monthly budget that applies to the target month
+	const relevantBudgets = category.monthlyBudgets
+		.filter((mb) => mb.startMonth <= month)
+		.sort((a, b) => b.startMonth.localeCompare(a.startMonth));
+
+	if (relevantBudgets.length === 0) {
+		return undefined;
+	}
+
+	// Return the rollover config from the most recent budget
+	return relevantBudgets[0].rolloverConfig;
 }
 
 /**
