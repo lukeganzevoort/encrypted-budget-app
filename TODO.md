@@ -42,7 +42,7 @@ February, 2026
 - [x] Fix pie chart labels
 - [ ] Allow creating rules for transactions to be automatically categorized
 - [ ] Allow specifying a vendor for transactions
-- [ ] Allow for budgets to be set for a specific month
+- [x] Allow for budgets to be set for a specific month
 - [ ] Make budget amounts roll over to the next month
 - [ ] Allow for manual transaction entry
 - [ ] Add recurring transactions feature (monthly bills, subscriptions)

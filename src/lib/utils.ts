@@ -81,3 +81,21 @@ export function getPreviousMonth(monthKey: string): string {
 	}
 	return `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
 }
+
+export function getNextMonth(monthKey: string): string {
+	const [year, month] = monthKey.split("-").map(Number);
+	let nextMonth = month + 1;
+	let nextYear = year;
+	if (nextMonth > 12) {
+		nextMonth = 1;
+		nextYear = year + 1;
+	}
+	return `${nextYear}-${String(nextMonth).padStart(2, "0")}`;
+}
+
+export function getCurrentMonth(): string {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, "0");
+	return `${year}-${month}`;
+}
