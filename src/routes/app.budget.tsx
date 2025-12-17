@@ -330,13 +330,13 @@ function RouteComponent() {
 
 		// Find or create monthly budget entry for this month
 		budgetCategoriesCollection.update(categoryId, (item) => {
-			const existingIndex = item.monthlyBudgets.findIndex(
+			const existing = item.monthlyBudgets.find(
 				(mb) => mb.startMonth === selectedMonthKey,
 			);
-			if (existingIndex >= 0) {
+			if (existing) {
 				// Update existing entry
-				item.monthlyBudgets[existingIndex].budgetedAmount = amount;
-				item.monthlyBudgets[existingIndex].rolloverConfig = rolloverConfig;
+				existing.budgetedAmount = amount;
+				existing.rolloverConfig = rolloverConfig;
 			} else {
 				// Add new entry for this month
 				const newBudget = {

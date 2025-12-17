@@ -243,7 +243,7 @@ function RouteComponent() {
 			if (!acc[account.type]) {
 				acc[account.type] = 0;
 			}
-			acc[account.type] += account.balance;
+			acc[account.type] = (acc[account.type] ?? 0) + account.balance;
 			return acc;
 		},
 		{} as Record<string, number>,
@@ -271,7 +271,7 @@ function RouteComponent() {
 			if (!acc[account.type]) {
 				acc[account.type] = [];
 			}
-			acc[account.type].push(account);
+			acc[account.type]?.push(account);
 			return acc;
 		},
 		{} as Record<string, Account[]>,

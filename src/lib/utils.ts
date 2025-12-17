@@ -73,6 +73,9 @@ export function formatDollars(
  */
 export function getPreviousMonth(monthKey: string): string {
 	const [year, month] = monthKey.split("-").map(Number);
+	if (!month || !year) {
+		throw new Error("Invalid month or year");
+	}
 	let prevMonth = month - 1;
 	let prevYear = year;
 	if (prevMonth < 1) {
@@ -84,6 +87,9 @@ export function getPreviousMonth(monthKey: string): string {
 
 export function getNextMonth(monthKey: string): string {
 	const [year, month] = monthKey.split("-").map(Number);
+	if (!month || !year) {
+		throw new Error("Invalid month or year");
+	}
 	let nextMonth = month + 1;
 	let nextYear = year;
 	if (nextMonth > 12) {

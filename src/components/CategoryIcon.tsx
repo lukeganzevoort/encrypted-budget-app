@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { type LucideIcon, Wallet } from "lucide-react";
 import {
 	AVAILABLE_ICONS,
 	DEFAULT_COLOR,
@@ -19,7 +19,8 @@ export function CategoryIcon({
 	className,
 }: CategoryIconProps) {
 	const IconComponent: LucideIcon =
-		AVAILABLE_ICONS[icon || DEFAULT_ICON] || AVAILABLE_ICONS[DEFAULT_ICON];
+		(AVAILABLE_ICONS[icon || DEFAULT_ICON] || AVAILABLE_ICONS[DEFAULT_ICON]) ??
+		Wallet;
 	const iconColor = color || DEFAULT_COLOR;
 
 	return (

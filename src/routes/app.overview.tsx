@@ -27,6 +27,7 @@ import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
 	getBudgetedAmountForMonth,
+	incomeCategoriesCollection,
 	isCategoryActiveForMonth,
 	transactionsCollection,
 } from "@/db-collections/index";
@@ -54,6 +55,24 @@ const CHART_COLORS = [
 ];
 
 function RouteComponent() {
+	const incomeCategories2 = useLiveQuery((q) =>
+		q
+			.from({ category: incomeCategoriesCollection })
+			.orderBy(({ category }) => category.startMonth, "asc"),
+	);
+
+	const transactions2 = useLiveQuery((q) =>
+		q
+			.from({ transaction: transactionsCollection })
+			.orderBy(({ transaction }) => transaction.date, "asc"),
+	);
+
+	const budgetCategories2 = useLiveQuery((q) =>
+		q
+			.from({ category: budgetCategoriesCollection })
+			.orderBy(({ category }) => category.startMonth, "asc"),
+	);
+
 	// Get current year and month
 	const now = new Date();
 	const currentYear = now.getFullYear();
@@ -72,6 +91,9 @@ function RouteComponent() {
 	const getMonthRange = (monthKey: string) => {
 		const [year, month] = monthKey.split("-").map(Number);
 		const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+		if (!month || !year) {
+			throw new Error("Invalid month or year");
+		}
 
 		// Calculate next month
 		const nextMonth = month === 12 ? 1 : month + 1;
@@ -177,15 +199,17 @@ function RouteComponent() {
 			chartData.push({
 				category: category.name,
 				amount,
-				fill: category.color || CHART_COLORS[colorIndex % CHART_COLORS.length],
+				fill:
+					(category.color || CHART_COLORS[colorIndex % CHART_COLORS.length]) ??
+					"#000000",
 				categoryId,
 			});
 			colorIndex++;
 		}
 	});
 
-	// Add uncategorized if there are any
 	if (uncategorizedTotal > 0) {
+		// Add uncategorized if there are any
 		chartData.push({
 			category: "Uncategorized",
 			amount: uncategorizedTotal,
@@ -330,8 +354,9 @@ function RouteComponent() {
 				budgetCategories.forEach((category) => {
 					const spending = categorySpending.get(category.id) || 0;
 					const fill =
-						category.color ||
-						CHART_COLORS[breakdownData.length % CHART_COLORS.length];
+						(category.color ||
+							CHART_COLORS[breakdownData.length % CHART_COLORS.length]) ??
+						"#000000";
 					breakdownData.push({
 						categoryId: category.id,
 						category,

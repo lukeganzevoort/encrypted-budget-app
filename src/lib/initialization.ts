@@ -85,8 +85,7 @@ export async function initializeBudgetDefaults(
 
 	// Initialize default categories for this month if none exist
 	if (!hasCategories) {
-		for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
-			const defaultCat = DEFAULT_CATEGORIES[i];
+		for (const [i, defaultCat] of DEFAULT_CATEGORIES.entries()) {
 			const id = await generateHash(`${defaultCat.name}-${Date.now()}-${i}`);
 			const category: BudgetCategory = {
 				id,

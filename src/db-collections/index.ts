@@ -141,7 +141,7 @@ export function getBudgetedAmountForMonth(
 	}
 
 	// Return the most recent budget (the one with the latest startMonth that applies)
-	return relevantBudgets[0].budgetedAmount;
+	return relevantBudgets[0]?.budgetedAmount ?? 0;
 }
 
 /**
@@ -165,7 +165,7 @@ export function getRolloverConfigForMonth(
 	}
 
 	// Return the rollover config from the most recent budget
-	return relevantBudgets[0].rolloverConfig;
+	return relevantBudgets[0]?.rolloverConfig;
 }
 
 /**
@@ -184,9 +184,11 @@ export function isCategoryActiveForMonth(
 /**
  * Gets the earliest start month from a category's monthly budgets
  */
-export function getEarliestStartMonth(category: BudgetCategory): string | null {
+export function getEarliestStartMonth(
+	category: BudgetCategory,
+): string | undefined {
 	if (category.monthlyBudgets.length === 0) {
-		return null;
+		return undefined;
 	}
 	return category.monthlyBudgets
 		.map((mb) => mb.startMonth)

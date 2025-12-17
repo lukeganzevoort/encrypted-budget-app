@@ -90,6 +90,9 @@ function RouteComponent() {
 	// Calculate start and end dates for the selected month
 	const getMonthRange = (monthKey: string) => {
 		const [year, month] = monthKey.split("-").map(Number);
+		if (!month || !year) {
+			throw new Error("Invalid month or year");
+		}
 		const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
 
 		// Calculate next month
@@ -288,7 +291,11 @@ function RouteComponent() {
 	) => {
 		transactionsCollection.update(transactionId, (item) => {
 			if (!item.splits) return;
-			item.splits[splitIndex].categoryId =
+			const itemSplit = item.splits[splitIndex];
+			if (!itemSplit) {
+				throw new Error("Split not found");
+			}
+			itemSplit.categoryId =
 				categoryId === "uncategorized" ? undefined : categoryId;
 		});
 	};
@@ -300,7 +307,11 @@ function RouteComponent() {
 	) => {
 		transactionsCollection.update(transactionId, (item) => {
 			if (!item.splits) return;
-			item.splits[splitIndex].amount = amount;
+			const itemSplit = item.splits[splitIndex];
+			if (!itemSplit) {
+				throw new Error("Split not found");
+			}
+			itemSplit.amount = amount;
 		});
 	};
 
@@ -476,6 +487,9 @@ function RouteComponent() {
 														{(() => {
 															const [year, month, day] =
 																transaction.date.split("-");
+															if (!month || !day || !year) {
+																throw new Error("Invalid date");
+															}
 															const currentYear = new Date().getFullYear();
 															const monthNum = Number.parseInt(month, 10);
 															const dayNum = Number.parseInt(day, 10);
