@@ -1,4 +1,8 @@
-import type { BudgetCategory, Transaction } from "@/db-collections";
+import type {
+	BudgetCategory,
+	IncomeCategory,
+	Transaction,
+} from "@/db-collections";
 import { getNextMonth, getPreviousMonth } from "./utils";
 
 export type RolloverForNextMonth = {
@@ -198,21 +202,31 @@ export class MonthlyBudget {
 	}
 
 	get categoriesMonthlyBudgets(): CategoryMonthlyBudget[] {
-		return this.categories.map(
-			(category) =>
-				new CategoryMonthlyBudget({
-					category,
-					month: this.month,
-					thisMonthTransactions: this.thisMonthTransactions.filter(
-						(transaction) => transaction.categoryId === category.id,
-					),
-					previousMonthsCategoryMonthlyBudgets:
-						this.previousMonthsCategoriesMonthlyBudgets.filter(
-							(categoryMonthlyBudget) =>
-								categoryMonthlyBudget.category.id === category.id,
+		return this.categories
+			.map(
+				(category) =>
+					new CategoryMonthlyBudget({
+						category,
+						month: this.month,
+						thisMonthTransactions: this.thisMonthTransactions.filter(
+							(transaction) => transaction.categoryId === category.id,
 						),
-				}),
-		);
+						previousMonthsCategoryMonthlyBudgets:
+							this.previousMonthsCategoriesMonthlyBudgets.filter(
+								(categoryMonthlyBudget) =>
+									categoryMonthlyBudget.category.id === category.id,
+							),
+					}),
+			)
+			.sort((a, b) => {
+				if (a.category.order !== b.category.order) {
+					return a.category.order - b.category.order;
+				}
+				if (b.spent !== a.spent) {
+					return b.spent - a.spent;
+				}
+				return a.category.name.localeCompare(b.category.name);
+			});
 	}
 
 	get totalSpent(): number {
@@ -299,4 +313,57 @@ export class MonthlyBudget {
 			orphanedCashFromPreviousMonth: this.orphanedCashFromPreviousMonth,
 		};
 	}
+}
+
+export function calculateMonthlyBudget({
+	month,
+	allIncome,
+	allCategories,
+	allTransactions,
+}: {
+	month: string;
+	allIncome: IncomeCategory[];
+	allCategories: BudgetCategory[];
+	allTransactions: Transaction[];
+}): { [month: string]: MonthlyBudget } {
+	// Get the earliest start month from the income categories
+	const startMonth = allIncome.sort((a, b) =>
+		a.startMonth.localeCompare(b.startMonth),
+	)[0]?.startMonth;
+	if (!startMonth) {
+		throw new Error("No start month found");
+	}
+
+	// Get all months between start month and selected month
+	const months = [];
+	for (
+		let currentMonth = startMonth;
+		currentMonth <= month;
+		currentMonth = getNextMonth(currentMonth)
+	) {
+		months.push(currentMonth);
+	}
+
+	// Get the monthly budgets for each month
+	const monthlyBudgets: { [month: string]: MonthlyBudget } = {};
+	months.forEach((month) => {
+		const categories = allCategories.filter(
+			(c) => c.startMonth <= month && (c.endMonth ? c.endMonth >= month : true),
+		);
+		const thisMonthTransactions = allTransactions.filter((t) =>
+			t.date.startsWith(month),
+		);
+		const previousMonthsCategoriesMonthlyBudgets =
+			monthlyBudgets[getPreviousMonth(month)]?.categoriesMonthlyBudgets ?? [];
+
+		const monthlyBudget = new MonthlyBudget({
+			categories,
+			month,
+			thisMonthTransactions,
+			previousMonthsCategoriesMonthlyBudgets,
+		});
+		monthlyBudgets[month] = monthlyBudget;
+	});
+
+	return monthlyBudgets;
 }

@@ -110,8 +110,8 @@ const BudgetCategorySchema = z.object({
 	name: z.string(),
 	description: z.string().optional(),
 	order: z.number(),
-	icon: z.string().optional(),
-	color: z.string().optional(),
+	icon: z.string(),
+	color: z.string(),
 	monthlyBudgets: z.array(MonthlyBudgetSchema),
 	startMonth: z.string(), // Format: "YYYY-MM" - the month this category was created (inclusive)
 	endMonth: z.string().optional(), // Format: "YYYY-MM" - if set, this category stops applying next month (inclusive)

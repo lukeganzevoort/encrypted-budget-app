@@ -1,4 +1,4 @@
-import { gte, lt, useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { LabelList, Pie, PieChart } from "recharts";
@@ -26,11 +26,10 @@ import {
 import {
 	type BudgetCategory,
 	budgetCategoriesCollection,
-	getBudgetedAmountForMonth,
 	incomeCategoriesCollection,
-	isCategoryActiveForMonth,
 	transactionsCollection,
 } from "@/db-collections/index";
+import { calculateMonthlyBudget } from "@/lib/calculate-budget";
 import { INCOME_CATEGORY_ID } from "@/lib/initialization";
 import { formatDollars } from "@/lib/utils";
 
@@ -87,52 +86,19 @@ function RouteComponent() {
 	// Combine year and month for query
 	const selectedMonthKey = `${selectedYear}-${selectedMonth}`;
 
-	// Calculate start and end dates for the selected month
-	const getMonthRange = (monthKey: string) => {
-		const [year, month] = monthKey.split("-").map(Number);
-		const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-		if (!month || !year) {
-			throw new Error("Invalid month or year");
-		}
-
-		// Calculate next month
-		const nextMonth = month === 12 ? 1 : month + 1;
-		const nextYear = month === 12 ? year + 1 : year;
-		const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
-
-		return { startDate, endDate };
-	};
-
-	const { startDate, endDate } = getMonthRange(selectedMonthKey);
-
-	// Query transactions from the database, filtered by selected month
-	const { data: transactions } = useLiveQuery(
-		(q) =>
-			q
-				.from({ transaction: transactionsCollection })
-				.where(({ transaction }) => gte(transaction.date, startDate))
-				.where(({ transaction }) => lt(transaction.date, endDate))
-				.select(({ transaction }) => ({
-					...transaction,
-				})),
-		[selectedYear, selectedMonth],
-	);
-
-	// Query all budget categories and filter client-side for active ones
-	const { data: allBudgetCategories } = useLiveQuery(
-		(q) =>
-			q
-				.from({ category: budgetCategoriesCollection })
-				.select(({ category }) => ({
-					...category,
-				})),
-		[selectedYear, selectedMonth],
-	);
-
-	// Filter categories that are active for the selected month
-	const budgetCategories = allBudgetCategories?.filter((category) =>
-		isCategoryActiveForMonth(category, selectedMonthKey),
-	);
+	const monthlyBudgets = calculateMonthlyBudget({
+		month: selectedMonthKey,
+		allIncome: incomeCategories2.data,
+		allCategories: budgetCategories2.data,
+		allTransactions: transactions2.data,
+	});
+	const monthlyBudget = monthlyBudgets[selectedMonthKey];
+	if (!monthlyBudget) {
+		throw new Error("No monthly budget found");
+	}
+	console.log(monthlyBudget.toJSON());
+	const budgetCategories = monthlyBudget.categories;
+	const transactions = monthlyBudget.thisMonthTransactions;
 
 	const uncategorizedCategory: BudgetCategory = {
 		id: "uncategorized",
@@ -151,7 +117,7 @@ function RouteComponent() {
 
 	// Calculate spending by category
 	const categorySpending = new Map<string, number>(
-		(budgetCategories ?? []).map((cat) => [cat.id, 0]),
+		budgetCategories.map((cat) => [cat.id, 0]),
 	);
 
 	let uncategorizedTotal = 0;
@@ -350,21 +316,6 @@ function RouteComponent() {
 					fill: string;
 				}> = [];
 
-				// Add all expense categories
-				budgetCategories.forEach((category) => {
-					const spending = categorySpending.get(category.id) || 0;
-					const fill =
-						(category.color ||
-							CHART_COLORS[breakdownData.length % CHART_COLORS.length]) ??
-						"#000000";
-					breakdownData.push({
-						categoryId: category.id,
-						category,
-						amount: spending,
-						fill,
-					});
-				});
-
 				// Add uncategorized if there are any
 				if (uncategorizedTotal > 0) {
 					breakdownData.push({
@@ -374,14 +325,6 @@ function RouteComponent() {
 						fill: "#9ca3af",
 					});
 				}
-
-				// Sort by amount descending, then by name
-				breakdownData.sort((a, b) => {
-					if (b.amount !== a.amount) {
-						return b.amount - a.amount;
-					}
-					return a.category.name.localeCompare(b.category.name);
-				});
 
 				if (budgetCategories.length === 0) {
 					return (
@@ -456,26 +399,24 @@ function RouteComponent() {
 							</CardHeader>
 							<CardContent>
 								<div className="space-y-4">
-									{breakdownData.length > 0 ? (
-										breakdownData.map((item) => {
-											const budgetedAmount = getBudgetedAmountForMonth(
-												item.category,
-												selectedMonthKey,
-											);
+									{monthlyBudget.categoriesMonthlyBudgets.length > 0 ? (
+										monthlyBudget.categoriesMonthlyBudgets.map((item) => {
+											const budgetedAmount =
+												item.budgetedAmount + item.previousMonthRollover;
 											const percentage =
 												budgetedAmount > 0
-													? (item.amount / budgetedAmount) * 100
-													: (item.amount / 0.001) * 100;
-											const isOverspent = item.amount > budgetedAmount;
+													? (-item.spent / budgetedAmount) * 100
+													: (-item.spent / 0.001) * 100;
+											const isOverspent = -item.spent > budgetedAmount;
 											return (
-												<Tooltip key={item.categoryId}>
+												<Tooltip key={item.category.id}>
 													<TooltipTrigger asChild>
-														<div key={item.categoryId}>
+														<div key={item.category.id}>
 															<div className="flex items-center justify-between mb-1">
 																<div className="flex items-center gap-2">
 																	<CategoryIcon
 																		icon={item.category.icon}
-																		color={item.fill}
+																		color={item.category.color}
 																		size={16}
 																	/>
 																	<span className="font-medium">
@@ -495,7 +436,7 @@ function RouteComponent() {
 																		isOverspent ? "text-red-600" : ""
 																	}`}
 																>
-																	{formatDollars(item.amount)}
+																	{formatDollars(-item.spent)}
 																</span>
 															</div>
 															<div className="flex items-center gap-2">
@@ -503,8 +444,8 @@ function RouteComponent() {
 																	<div
 																		className="h-2 rounded-full"
 																		style={{
-																			width: `${Math.min(percentage, 100)}%`,
-																			backgroundColor: item.fill,
+																			width: `${Math.max(Math.min(percentage, 100), 0)}%`,
+																			backgroundColor: item.category.color,
 																		}}
 																	/>
 																</div>
@@ -526,7 +467,9 @@ function RouteComponent() {
 															{isOverspent && (
 																<div className="text-red-600 font-semibold mt-1">
 																	Over by:{" "}
-																	{formatDollars(item.amount - budgetedAmount)}
+																	{formatDollars(
+																		-(item.spent + budgetedAmount),
+																	)}
 																</div>
 															)}
 														</div>
