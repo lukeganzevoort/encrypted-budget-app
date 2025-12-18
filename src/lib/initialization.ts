@@ -10,6 +10,21 @@ import { generateHash } from "@/lib/utils";
 export const CASH_ACCOUNT_ID = "cash-account-default";
 export const INCOME_CATEGORY_ID = "income-category-default";
 
+export const DEFAULT_UNCATEGORIZED_CATEGORY: BudgetCategory = {
+	id: "__uncategorized_category_default__",
+	order: 0,
+	name: "Uncategorized",
+	icon: "CircleQuestionMark",
+	color: "#6b7280",
+	startMonth: "0000-00",
+	monthlyBudgets: [
+		{
+			budgetedAmount: 0,
+			startMonth: "0000-00",
+		},
+	],
+};
+
 export const DEFAULT_INCOME = 5000;
 export const DEFAULT_CATEGORIES = [
 	{ name: "Giving", amount: 500, icon: "Heart", color: "#ec4899" },

@@ -3,6 +3,7 @@ import {
 	Briefcase,
 	Car,
 	Cat,
+	CircleQuestionMark,
 	Coffee,
 	CreditCard,
 	Dog,
@@ -74,3 +75,10 @@ export const AVAILABLE_COLORS = [
 
 export const DEFAULT_ICON = "Wallet";
 export const DEFAULT_COLOR = "#3b82f6";
+
+export function getIcon(icon: string): LucideIcon {
+	if (icon === "CircleQuestionMark") {
+		return CircleQuestionMark;
+	}
+	return AVAILABLE_ICONS[icon] ?? AVAILABLE_ICONS[DEFAULT_ICON] ?? Wallet;
+}

@@ -30,7 +30,10 @@ import {
 	transactionsCollection,
 } from "@/db-collections/index";
 import { calculateMonthlyBudget } from "@/lib/calculate-budget";
-import { INCOME_CATEGORY_ID } from "@/lib/initialization";
+import {
+	DEFAULT_UNCATEGORIZED_CATEGORY,
+	INCOME_CATEGORY_ID,
+} from "@/lib/initialization";
 import { formatDollars } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/overview")({
@@ -72,6 +75,22 @@ function RouteComponent() {
 			.orderBy(({ category }) => category.startMonth, "asc"),
 	);
 
+	if (
+		!budgetCategories2.data.some(
+			(c) => c.id === DEFAULT_UNCATEGORIZED_CATEGORY.id,
+		)
+	) {
+		budgetCategoriesCollection.insert(DEFAULT_UNCATEGORIZED_CATEGORY);
+	}
+
+	transactions2.data.forEach((transaction) => {
+		if (!transaction.categoryId) {
+			transactionsCollection.update(transaction.id, (item) => {
+				item.categoryId = DEFAULT_UNCATEGORIZED_CATEGORY.id;
+			});
+		}
+	});
+
 	// Get current year and month
 	const now = new Date();
 	const currentYear = now.getFullYear();
@@ -99,21 +118,6 @@ function RouteComponent() {
 	console.log(monthlyBudget.toJSON());
 	const budgetCategories = monthlyBudget.categories;
 	const transactions = monthlyBudget.thisMonthTransactions;
-
-	const uncategorizedCategory: BudgetCategory = {
-		id: "uncategorized",
-		order: 0,
-		name: "Uncategorized",
-		icon: "CircleQuestionMark",
-		color: "#9ca3af",
-		startMonth: selectedMonthKey,
-		monthlyBudgets: [
-			{
-				budgetedAmount: 0,
-				startMonth: selectedMonthKey,
-			},
-		],
-	};
 
 	// Calculate spending by category
 	const categorySpending = new Map<string, number>(
@@ -308,25 +312,7 @@ function RouteComponent() {
 
 			{/* Pie Chart and Category Breakdown */}
 			{(() => {
-				// Build breakdown data for all categories (excluding income)
-				const breakdownData: Array<{
-					categoryId: string;
-					category: BudgetCategory;
-					amount: number;
-					fill: string;
-				}> = [];
-
-				// Add uncategorized if there are any
-				if (uncategorizedTotal > 0) {
-					breakdownData.push({
-						categoryId: "uncategorized",
-						category: uncategorizedCategory,
-						amount: uncategorizedTotal,
-						fill: "#9ca3af",
-					});
-				}
-
-				if (budgetCategories.length === 0) {
+				if (monthlyBudget.categoriesMonthlyBudgets.length === 0) {
 					return (
 						<Card>
 							<CardContent className="flex items-center justify-center py-16">
@@ -401,13 +387,20 @@ function RouteComponent() {
 								<div className="space-y-4">
 									{monthlyBudget.categoriesMonthlyBudgets.length > 0 ? (
 										monthlyBudget.categoriesMonthlyBudgets.map((item) => {
-											const budgetedAmount =
+											const allotted =
 												item.budgetedAmount + item.previousMonthRollover;
+											if (
+												item.category.id ===
+													DEFAULT_UNCATEGORIZED_CATEGORY.id &&
+												item.thisMonthTransactions.length === 0
+											) {
+												return null;
+											}
 											const percentage =
-												budgetedAmount > 0
-													? (-item.spent / budgetedAmount) * 100
+												allotted !== 0
+													? (-item.spent / allotted) * 100
 													: (-item.spent / 0.001) * 100;
-											const isOverspent = -item.spent > budgetedAmount;
+											const isOverspent = -item.spent > allotted;
 											return (
 												<Tooltip key={item.category.id}>
 													<TooltipTrigger asChild>
@@ -456,20 +449,32 @@ function RouteComponent() {
 																			: "text-muted-foreground"
 																	}`}
 																>
-																	{`${isOverspent ? ">100" : Math.min(percentage, 100).toFixed(0)}%`}
+																	{`${isOverspent ? ">100" : Math.max(0, Math.min(percentage, 100)).toFixed(0)}%`}
 																</span>
 															</div>
 														</div>
 													</TooltipTrigger>
 													<TooltipContent side="top" align="end">
 														<div>
-															Budgeted: {formatDollars(budgetedAmount)}
+															Allocated: {formatDollars(allotted)}
+															{item.previousMonthRollover > 0 && (
+																<div className="text-muted-foreground text-xs">
+																	Previous month rollover:{" "}
+																	{formatDollars(item.previousMonthRollover)}
+																</div>
+															)}
+															{
+																<div className="text-muted-foreground text-xs">
+																	Budgeted: {formatDollars(item.budgetedAmount)}
+																</div>
+															}
+															<div className="text-xs">
+																Spent: {formatDollars(-item.spent)}
+															</div>
 															{isOverspent && (
 																<div className="text-red-600 font-semibold mt-1">
 																	Over by:{" "}
-																	{formatDollars(
-																		-(item.spent + budgetedAmount),
-																	)}
+																	{formatDollars(-(item.spent + allotted))}
 																</div>
 															)}
 														</div>
